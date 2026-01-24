@@ -217,8 +217,8 @@ class VoiceAgent:
             "input": {"text": text},
             "voice": {
                 "languageCode": "en-US",
-                "name": "en-US-Neural2-D",  # Premium male voice (matches Josh persona)
-                "ssmlGender": "MALE",
+                "name": "en-US-Neural2-F",  # Female voice (Debug: If you hear this, ElevenLabs failed)
+                "ssmlGender": "FEMALE",
             },
             "audioConfig": {
                 "audioEncoding": "MP3",
