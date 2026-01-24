@@ -166,28 +166,35 @@ class VoiceAgent:
 
         try:
             try:
-                audio_stream = await self.client.text_to_speech.convert(
+                # IMPORTANT: convert() returns an async generator, do NOT await the call itself
+                audio_stream = self.client.text_to_speech.convert(
                     text=text,
                     voice_id=voice_id,
                     model_id="eleven_multilingual_v2",
                     output_format="mp3_44100_128",
                 )
+
+                # Consume the async generator to get full audio bytes
+                audio_data = b""
+                async for chunk in audio_stream:
+                    audio_data += chunk
+
             except Exception as e:
                 logger.warning(
                     f"ElevenLabs Multilingual V2 failed ({e}), falling back to Monolingual V1"
                 )
                 # Fallback to standard model
-                audio_stream = await self.client.text_to_speech.convert(
+                # Do NOT await the generator creation
+                audio_stream = self.client.text_to_speech.convert(
                     text=text,
                     voice_id=voice_id,
                     model_id="eleven_monolingual_v1",
                     output_format="mp3_44100_128",
                 )
 
-            # Consume the async generator to get full audio bytes
-            audio_data = b""
-            async for chunk in audio_stream:
-                audio_data += chunk
+                audio_data = b""
+                async for chunk in audio_stream:
+                    audio_data += chunk
 
             if return_base64:
                 audio_b64 = base64.b64encode(audio_data).decode("utf-8")
@@ -217,8 +224,8 @@ class VoiceAgent:
             "input": {"text": text},
             "voice": {
                 "languageCode": "en-US",
-                "name": "en-US-Neural2-F",  # Female voice (Debug: If you hear this, ElevenLabs failed)
-                "ssmlGender": "FEMALE",
+                "name": "en-US-Neural2-D",  # Premium male voice (matches Josh persona)
+                "ssmlGender": "MALE",
             },
             "audioConfig": {
                 "audioEncoding": "MP3",
