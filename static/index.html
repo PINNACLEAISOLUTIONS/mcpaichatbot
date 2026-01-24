@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Miami Loves Green Landscaping AI Agent</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Inter:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Main Chat Area (No sidebar) -->
+        <main class="main-chat">
+            <header class="chat-header">
+                <div class="header-title">
+                    <img src="/static/miami-logo.png" alt="Miami Loves Green" class="header-avatar"
+                        style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid #4CAF50; object-fit: cover;">
+                    <span class="header-text">Miami Loves Green Landscaping AI Agent</span>
+                </div>
+                <div class="header-controls" style="display: flex; align-items: center; gap: 10px;">
+                    <button id="voice-mode-btn" class="voice-mode-button" title="Activate Voice Mode">
+                        <span class="voice-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                <line x1="12" y1="19" x2="12" y2="23" />
+                                <line x1="8" y1="23" x2="16" y2="23" />
+                            </svg>
+                        </span>
+                        <span class="voice-text">Voice Mode</span>
+                        <span class="voice-pulse"></span>
+                    </button>
+                    <img src="/static/logo-tropical.png" alt="Miami Loves Green"
+                        style="height: 40px; border-radius: 8px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+                </div>
+            </header>
+
+            <!-- 3D Light Green Banner -->
+            <div class="brand-banner" style="
+                text-align: center;
+                padding: 12px 20px;
+                background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(139, 195, 74, 0.1));
+                border-bottom: 1px solid rgba(76, 175, 80, 0.3);
+            ">
+                <h2 style="
+                    margin: 0;
+                    font-family: 'Outfit', sans-serif;
+                    font-size: clamp(1rem, 3vw, 1.4rem);
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 2px;
+                    background: linear-gradient(135deg, #8BC34A 0%, #4CAF50 50%, #2E7D32 100%);
+                    -webkit-background-clip: text;
+                    background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    text-shadow: none;
+                    filter: drop-shadow(2px 2px 1px rgba(0,0,0,0.3)) drop-shadow(-1px -1px 0px rgba(255,255,255,0.2));
+                ">MIAMI LOVES GREEN LANDSCAPING</h2>
+            </div>
+
+            <div id="chat-messages" class="chat-messages">
+                <div class="message assistant-message first">
+                    <div class="message-content">
+                        <strong>👋 Hello! I'm the Miami Loves Green Landscaping AI Agent.</strong><br><br>
+                        I can help you with landscaping questions, generate design ideas, and provide quotes for your
+                        project!<br><br>
+                        <em>How can I assist you today?</em>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-container">
+                    <div class="input-row">
+                        <textarea id="user-input" placeholder="Ask about our landscaping services..."
+                            rows="1"></textarea>
+                        <button id="mic-btn" class="mic-button" title="Speak to type">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                <line x1="12" y1="19" x2="12" y2="23" />
+                                <line x1="8" y1="23" x2="16" y2="23" />
+                            </svg>
+                        </button>
+                        <button id="send-btn" class="send-button">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Background Decoration -->
+    <div class="bg-blur blur-1"></div>
+    <div class="bg-blur blur-2"></div>
+
+    <script src="/static/config.js"></script>
+    <script src="/static/chat.js"></script>
+</body>
+
+</html>

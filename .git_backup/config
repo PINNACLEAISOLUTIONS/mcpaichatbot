@@ -1,0 +1,15 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+	symlinks = false
+	ignorecase = true
+[remote "origin"]
+	url = https://github.com/PINNACLEAISOLUTIONS/MIAMILOVESGREENLANDSCAPING.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "master"]
+	gk-last-accessed = 2026-01-23T01:54:04.449Z
+	remote = origin
+	merge = refs/heads/master
+	gk-last-modified = 2026-01-23T01:37:10.034Z

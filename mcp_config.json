@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "autoagent-local": {
+      "command": "python",
+      "args": [
+        "./mcp_server_autoagent.py"
+      ],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
+    },
+    "memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ]
+    },
+    "websearch": {
+      "command": "python",
+      "args": [
+        "./mcp_server_websearch.py"
+      ]
+    },
+    "nanobanana": {
+      "command": "node",
+      "args": [
+        "./nanobanana-server/mcp-server/dist/index.js"
+      ]
+    }
+  }
+}

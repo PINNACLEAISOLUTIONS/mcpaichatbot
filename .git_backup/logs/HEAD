@@ -1,0 +1,3 @@
+0000000000000000000000000000000000000000 2086ae03cd0140a2ea93eca7b33e8c1c5c82e220 Antigravity AI <antigravity@gemini.ai> 1769129139 -0800	commit (initial): Initial commit: Miami Loves Green Agent chatbot
+2086ae03cd0140a2ea93eca7b33e8c1c5c82e220 761deadc8e067a413c4ea7e644546f8df8a484fd Antigravity AI <antigravity@gemini.ai> 1769129852 -0800	commit: Remove background from assistant messages
+761deadc8e067a413c4ea7e644546f8df8a484fd 9685ce659bf4d2b57d7d324c776c7edcac403e91 Antigravity AI <antigravity@gemini.ai> 1769130347 -0800	commit: Remove all background gradients from chat header and main area
