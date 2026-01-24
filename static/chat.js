@@ -424,7 +424,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             console.log('Calling ElevenLabs TTS API...');
             // Use Direct Voice ID for Josh to prevent mapping errors
-            const voiceId = "TxGEqnHWrfWFTfGW9XjX";
+            // Use Direct Voice ID for Miami Custom Voice
+            const voiceId = "s3TPKV1kjDlVtZbl4Ksh";
             const response = await fetch(`${API_BASE}/api/tts`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
