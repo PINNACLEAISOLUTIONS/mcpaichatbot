@@ -11,7 +11,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-class PollinationsImageClient:
+class PollinationsClient:
     """Client for Pollinations.ai image generation - Free and easy to use"""
 
     def __init__(self):
