@@ -54,13 +54,14 @@ class MCPChatbot:
         """
         self.mcp_manager = mcp_manager
 
-        # Initialize clients to None
-        self.hf_client = None  # HuggingFace MCP client (for search, not images)
-        self.gemini_image_client = None  # FREE Gemini 2.0 Flash image generation
+        # Initialize clients
+        self.hf_client = None
+        self.gemini_image_client = None
         self.public_base_url = (os.getenv("PUBLIC_BASE_URL") or "").rstrip("/")
-        logger.info(
-            f"🌐 PUBLIC_BASE_URL initialized as: {self.public_base_url or 'NOT SET'}"
-        )
+        self.hf_inference = None
+        self.replicate_client = None
+        self.fal_client = None
+        self.pollinations_client = None
 
         self.groq_client = None
 
@@ -124,10 +125,18 @@ class MCPChatbot:
         self.context_summary = ""  # Holds summarized history
 
         self.system_instruction = (
-            "You are the Miami Loves Green Landscaping Chatbot, a helpful assistant for a premier landscaping company in Miami, Florida. "
-            "Help with: landscape design, garden maintenance, hardscaping, irrigation, tree care, and outdoor lighting. "
-            "Be friendly, professional, and concise. "
-            "Our contact info: (786) 570-3215 | miamilovesgreenlandscaping@gmail.com. "
+            "You are Pinnacle AI Expert, the lead consultant for Pinnacle AI Solutions. "
+            "Your mission is to provide cutting-edge, professional AI and development advice. "
+            "### OUR CORE PILLARS:\n"
+            "1. **Website Development**: We build high-performance, responsive web applications.\n"
+            "2. **AI Chatbot Integrations**: We specialize in custom RAG systems and LiteLLM orchestration.\n"
+            "3. **AI Agents**: We design autonomous workflows and complex multi-agent systems.\n"
+            "4. **Scrapers & Data Extraction**: We create high-scale, stealthy scrapers.\n\n"
+            "### YOUR BEHAVIOR:\n"
+            "- **Ask Questions**: When a user mentions a need, ask clarifying questions to provide expert ideas.\n"
+            "- **Be Professional**: Use clear, concise, and technically accurate language.\n"
+            "- **Lead Capture**: When a user wants to CONTACT you or start a project, "
+            "you MUST call the 'send_lead_email' tool and notify the experts."
         )
 
         # Session management
@@ -538,7 +547,7 @@ class MCPChatbot:
         self.conversation_history.append(
             {
                 "role": "assistant",
-                "content": "Hello! I'm the Miami Loves Green Landscaping AI Agent. I'm here to help you with any questions about our landscaping services in Miami. How can I assist you today?",
+                "content": "Hello! I'm Pinnacle AI Expert. I'm here to help you with cutting-edge AI solutions, website development, and automation. How can I assist your business today?",
             }
         )
 
@@ -567,7 +576,7 @@ class MCPChatbot:
             {"role": "system", "content": self.system_instruction},
             {
                 "role": "assistant",
-                "content": "Hello! I'm the Miami Loves Green Landscaping AI Agent. I can help you with landscaping questions, generate design ideas, and provide quotes. How can I assist you today?",
+                "content": "Hello! I'm Pinnacle AI Expert. I can help you design AI agents, build high-performance websites, or create custom scrapers. What project are you working on?",
             },
         ]
         logger.info("Chat session reset.")
@@ -736,6 +745,34 @@ class MCPChatbot:
 
         if not mcp_tools:
             return None
+
+        openai_tools = []
+
+        # --- Add Internal Lead Tool ---
+        openai_tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": "send_lead_email",
+                    "description": "Send a 'website request' email to the Pinnacle AI team. Call this when the user wants to contact us, ask a question, or discuss a project.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "interest_detail": {
+                                "type": "string",
+                                "description": "Details about what the user is interested in (e.g., 'Website development', 'AI agents')",
+                            },
+                            "user_info": {
+                                "type": "string",
+                                "description": "Optional contact info if provided by user (email, name, etc.)",
+                            },
+                        },
+                        "required": ["interest_detail"],
+                    },
+                },
+            }
+        )
+        # -----------------------------
 
         # Filter tools by tool name if a filter is provided
         if tool_filter is not None:
@@ -1539,147 +1576,120 @@ class MCPChatbot:
         )
         raise Exception(friendly_error)
 
+    async def _send_lead_email(
+        self, interest_detail: str, user_info: Optional[str] = None
+    ):
+        """Send lead notification email to futureai4all@gmail.com"""
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.header import Header
+
+        gmail_user = os.getenv("GMAIL_USER")
+        gmail_password = os.getenv("GMAIL_APP_PASSWORD")
+
+        if not gmail_user or not gmail_password:
+            logger.warning("Email credentials missing. Cannot send lead email.")
+            return "Note: Lead capture failed (server configuration missing)."
+
+        subject = "website request"
+        body = f"New Contact Request from Website!\n\nInterest: {interest_detail}\nUser Info: {user_info or 'Not provided'}\nSession: {self.session_id}"
+
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["Subject"] = Header(subject, "utf-8")
+        msg["From"] = gmail_user
+        msg["To"] = "futureai4all@gmail.com"
+
+        try:
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+                server.login(gmail_user, gmail_password)
+                server.send_message(msg)
+            logger.info(f"Lead email sent for session {self.session_id}")
+            return "Success: Our team has been notified. We will get back to you soon!"
+        except Exception as e:
+            logger.error(f"Failed to send lead email: {e}")
+            return f"Error sending notification: {str(e)}"
+
     async def _execute_mcp_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         """Execute an MCP tool with safety gate and robust image fallback"""
         logger.info(f"DEBUG: _execute_mcp_tool -> tool='{tool_name}' args={arguments}")
 
-        # 1. IMAGE GENERATION - Deterministic Chain: Gemini → Pollinations
+        # 0. Internal Lead Tool
+        if tool_name == "send_lead_email":
+            return await self._send_lead_email(
+                interest_detail=arguments.get("interest_detail", ""),
+                user_info=arguments.get("user_info"),
+            )
+
+        # 1. IMAGE GENERATION - Deterministic Chain: Gemini -> Pollinations
         if tool_name == "generate_image":
-            # ========== PROFESSIONAL HARDENING: Image Cooldown ==========
+            # Image Cooldown
             time_since_last = time.time() - self._last_image_request
             if time_since_last < self._image_cooldown_seconds:
                 wait_time = int(self._image_cooldown_seconds - time_since_last)
-                logger.info(f"⏳ Image cooldown active, {wait_time}s remaining")
                 return {
-                    "error": f"Please wait {wait_time} seconds before requesting another image.",
-                    "cooldown": True,
+                    "error": f"Please wait {wait_time} seconds before requesting another image."
                 }
             self._last_image_request = time.time()
-            # ========== END PROFESSIONAL HARDENING ==========
 
             img_prompt = (arguments.get("prompt") or "").strip()
-            if not img_prompt:
-                logger.warning("⚠️ Image prompt missing in tool arguments.")
-                return {"error": "Image prompt missing."}
-
             aspect_ratio = arguments.get("aspect_ratio", "1:1")
 
-            # --- STEP 1: Gemini Image ---
+            # Step 1: Gemini
             if self.gemini_image_client:
-                logger.info("🎨 Trying provider: gemini")
-                try:
-                    res = await self.gemini_image_client.generate_image(
-                        prompt=img_prompt, aspect_ratio=aspect_ratio
-                    )
-                    if res.get("success"):
-                        logger.info("✅ Gemini success")
-                        image_url = res.get("image_url")
-                        if (
-                            image_url
-                            and not image_url.startswith("http")
-                            and self.public_base_url
-                        ):
-                            image_url = f"{self.public_base_url}{image_url}"
+                logger.info("🎨 Trying Gemini Image Gen")
+                res = await self.gemini_image_client.generate_image(
+                    prompt=img_prompt, aspect_ratio=aspect_ratio
+                )
+                if res.get("success"):
+                    image_url = res.get("image_url")
+                    if (
+                        image_url
+                        and not image_url.startswith("http")
+                        and self.public_base_url
+                    ):
+                        image_url = f"{self.public_base_url}{image_url}"
+                    return {
+                        "image_url": image_url,
+                        "image_base64": res.get("image_base64"),
+                        "prompt": img_prompt,
+                        "provider": "gemini",
+                    }
 
-                        return {
-                            "image_url": image_url,
-                            "image_base64": res.get("image_base64"),
-                            "prompt": img_prompt,
-                            "provider": "gemini",
-                            "mime_type": res.get("mime_type", "image/png"),
-                        }
-                    logger.warning(f"Gemini failed: {res.get('error')}")
-                except Exception as e:
-                    logger.warning(f"Gemini failed: {e}")
-
-            # --- STEP 2: Pollinations ---
-            logger.info("🎨 Trying provider: pollinations")
+            # Step 2: Fallback Pollinations
+            logger.info("🎨 Falling back to Pollinations")
             try:
                 import urllib.parse
 
-                encoded_prompt = urllib.parse.quote(img_prompt)
-                poll_models = [os.getenv("POLLINATIONS_IMAGE_MODEL", "turbo"), "flux"]
-
-                for p_model in poll_models:
-                    logger.info(f"Trying Pollinations model: {p_model}")
-                    for attempt in range(2):
-                        try:
-                            poll_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={uuid.uuid4().int % 1000000}&nologo=true&model={p_model}"
-                            async with httpx.AsyncClient() as client:
-                                resp = await client.get(poll_url, timeout=30.0)
-                                c_type = resp.headers.get("content-type", "").lower()
-                                if resp.status_code == 200 and "image" in c_type:
-                                    img_b64 = base64.b64encode(resp.content).decode(
-                                        "utf-8"
-                                    )
-
-                                    # Save to static
-                                    filename = f"pollin_{uuid.uuid4().hex[:8]}.jpg"
-                                    local_path = Path("static/generated") / filename
-                                    local_path.parent.mkdir(parents=True, exist_ok=True)
-                                    with open(local_path, "wb") as f:
-                                        f.write(resp.content)
-
-                                    rel_url = f"/static/generated/{filename}"
-                                    abs_url = (
-                                        f"{self.public_base_url}{rel_url}"
-                                        if self.public_base_url
-                                        else rel_url
-                                    )
-
-                                    logger.info(f"✅ Pollinations success ({p_model})")
-                                    return {
-                                        "image_url": abs_url,
-                                        "image_base64": img_b64,
-                                        "prompt": img_prompt,
-                                        "provider": "pollinations",
-                                        "mime_type": "image/jpeg",
-                                    }
-                                else:
-                                    logger.warning(
-                                        f"Pollinations {p_model} non-image response: {resp.text[:100]}"
-                                    )
-                        except Exception as e:
-                            logger.warning(f"Pollinations {p_model} exception: {e}")
-
-                logger.warning("Pollinations failed: All models/attempts exhausted")
+                encoded = urllib.parse.quote(img_prompt)
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(
+                        f"https://image.pollinations.ai/prompt/{encoded}?nologo=true",
+                        timeout=30.0,
+                    )
+                    if resp.status_code == 200:
+                        filename = f"pollin_{uuid.uuid4().hex[:8]}.jpg"
+                        local_path = Path("static/generated") / filename
+                        local_path.parent.mkdir(parents=True, exist_ok=True)
+                        with open(local_path, "wb") as f:
+                            f.write(resp.content)
+                        abs_url = (
+                            f"{self.public_base_url}/static/generated/{filename}"
+                            if self.public_base_url
+                            else f"/static/generated/{filename}"
+                        )
+                        return {
+                            "image_url": abs_url,
+                            "prompt": img_prompt,
+                            "provider": "pollinations",
+                        }
             except Exception as e:
-                logger.warning(f"Pollinations overall failure: {e}")
+                logger.error(f"Pollinations fallback failed: {e}")
 
-            # Final log for verification (Acceptance Test 4)
-            final_provider = (
-                self._last_image_data.get("provider", "unknown")
-                if self._last_image_data
-                else "none"
-            )
-            url_type = "none"
-            if self._last_image_data:
-                if self._last_image_data.get("image_base64"):
-                    url_type = "base64"
-                elif self._last_image_data.get("image_url"):
-                    img_url = str(self._last_image_data.get("image_url") or "")
-                    url_type = "local" if "onrender.com" in img_url else "external"
-
-            logger.info(
-                f"📸 IMAGE REQUEST: provider={final_provider}, url_type={url_type}"
-            )
-
-            return {
-                "error": "All image generation providers failed. Please try a different prompt or try again later."
-            }
+            return {"error": "Image generation failed. Please try again."}
 
         # 2. STANDARD MCP TOOLS
         server_name, actual_tool_name = self.mcp_manager.parse_tool_call(tool_name)
 
-        # Hugging Face MCP tools
-        if any(
-            tool_name.startswith(p) for p in ["hf.", "spaces.", "hub."]
-        ) or server_name in ["hf", "huggingface"]:
-            if not self.hf_client:
-                return "Error: Hugging Face MCP client not initialized."
-            return await self.hf_client.call_tool(actual_tool_name, arguments)
-
-        # Generic MCP routing
         if not server_name:
             return f"Refused: Tool '{tool_name}' is not recognized."
 

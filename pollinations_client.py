@@ -4,7 +4,9 @@ import logging
 import base64
 import httpx  # type: ignore
 import urllib.parse
+import uuid
 from typing import Dict, Any, Optional
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +36,6 @@ class PollinationsImageClient:
         """Generate an image using Pollinations.ai with automatic model fallback"""
 
         # Model fallback chain - try without model first (uses default), then specific models
-        # None = no model param (lets Pollinations choose the best available)
         model_chain = [None, "flux", "turbo", "flux-realism", "flux-anime", "flux-3d"]
 
         last_error = None
@@ -58,54 +59,36 @@ class PollinationsImageClient:
 
                 # Pollinations generates images on the fly via GET
                 async with httpx.AsyncClient() as client:
-                    logger.info(f"🎨 Pollinations: Fetching from {img_url[:80]}...")
                     response = await client.get(
-                        img_url, timeout=180.0, follow_redirects=True
+                        img_url, timeout=60.0, follow_redirects=True
                     )
 
-                    # Check for server errors - try next model
                     if response.status_code >= 500:
-                        logger.warning(
-                            f"Pollinations model '{current_model}' returned {response.status_code}, trying next..."
-                        )
                         last_error = (
                             f"Model {current_model}: Status {response.status_code}"
                         )
                         continue
 
                     if response.status_code != 200:
-                        logger.warning(
-                            f"Pollinations failed with status {response.status_code}"
-                        )
                         last_error = f"Status {response.status_code}"
                         continue
 
-                    # Validate that we got actual image data, not HTML/JSON error page
                     content_type = response.headers.get("content-type", "")
                     if (
                         "text/html" in content_type
                         or "application/json" in content_type
                     ):
-                        logger.warning(
-                            f"Pollinations model '{current_model}' returned non-image: {content_type}, trying next..."
-                        )
                         last_error = f"Model {current_model}: Non-image response"
                         continue
 
-                    # Check if content looks like valid image data
                     image_bytes = response.content
                     if len(image_bytes) < 100:
-                        logger.warning(
-                            f"Pollinations model '{current_model}' returned too little data: {len(image_bytes)} bytes"
-                        )
                         last_error = f"Model {current_model}: Invalid image data"
                         continue
 
                     img_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
-                    logger.info(
-                        f"✅ Pollinations SUCCESS with model '{current_model}' ({len(image_bytes)} bytes)"
-                    )
+                    logger.info(f"✅ Pollinations SUCCESS with model '{current_model}'")
                     return {
                         "image_base64": img_b64,
                         "image_url": img_url,
@@ -115,22 +98,10 @@ class PollinationsImageClient:
                         "provider": "pollinations",
                     }
 
-            except httpx.TimeoutException:
-                logger.warning(
-                    f"Pollinations model '{current_model}' timed out, trying next..."
-                )
-                last_error = f"Model {current_model}: Timeout"
-                continue
             except Exception as e:
-                error_msg = str(e)
-                logger.warning(
-                    f"Pollinations model '{current_model}' error: {error_msg}, trying next..."
-                )
-                last_error = f"Model {current_model}: {error_msg}"
+                last_error = str(e)
                 continue
 
-        # All models failed
-        logger.error(f"All Pollinations models failed. Last error: {last_error}")
         return {"error": f"Pollinations: All models unavailable. {last_error}"}
 
     def get_tools(self) -> list:
