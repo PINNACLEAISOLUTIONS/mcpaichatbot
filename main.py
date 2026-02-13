@@ -75,8 +75,15 @@ active_chatbots: Dict[str, MCPChatbot] = {}
 # Rate Limiting & Caching State
 ip_request_counts: Dict[str, List[float]] = defaultdict(list)
 session_request_counts: Dict[str, List[float]] = defaultdict(list)
+session_total_counts: Dict[str, int] = defaultdict(int)  # Total messages per session
 response_cache: Dict[tuple[str, str], Dict[str, Any]] = {}
 CACHE_TTL = 600  # 10 minutes
+
+# Anti-spam limits
+RATE_LIMIT_IP_PER_MINUTE = 12  # Max requests per IP per 60s
+RATE_LIMIT_IP_PER_10MIN = 40  # Max requests per IP per 10 min
+RATE_LIMIT_SESSION_COOLDOWN = 3  # Seconds between messages per session
+RATE_LIMIT_SESSION_TOTAL = 50  # Max total messages per session (resets on new session)
 
 
 class ChatMessage(BaseModel):
@@ -207,18 +214,41 @@ async def chat_endpoint(chat_msg: ChatMessage, request: Request):
     user_message = chat_msg.message.strip()
 
     now = time.time()
+    # Clean sliding windows
     ip_request_counts[client_ip] = [
-        t for t in ip_request_counts[client_ip] if now - t < 60
+        t for t in ip_request_counts[client_ip] if now - t < 600
     ]
     session_request_counts[session_id] = [
-        t for t in session_request_counts[session_id] if now - t < 5
+        t
+        for t in session_request_counts[session_id]
+        if now - t < RATE_LIMIT_SESSION_COOLDOWN
     ]
 
-    if len(ip_request_counts[client_ip]) >= 15:
-        raise HTTPException(status_code=429, detail="Too many requests from this IP.")
+    # Anti-spam checks
+    recent_1min = [t for t in ip_request_counts[client_ip] if now - t < 60]
+    if len(recent_1min) >= RATE_LIMIT_IP_PER_MINUTE:
+        raise HTTPException(
+            status_code=429,
+            detail="Slow down! Too many messages. Please wait a moment.",
+        )
+
+    if len(ip_request_counts[client_ip]) >= RATE_LIMIT_IP_PER_10MIN:
+        raise HTTPException(
+            status_code=429,
+            detail="You've sent a lot of messages. Please take a short break and try again.",
+        )
 
     if len(session_request_counts[session_id]) >= 1:
-        raise HTTPException(status_code=429, detail="One message every 5 seconds.")
+        raise HTTPException(
+            status_code=429,
+            detail=f"Please wait {RATE_LIMIT_SESSION_COOLDOWN} seconds between messages.",
+        )
+
+    if session_total_counts[session_id] >= RATE_LIMIT_SESSION_TOTAL:
+        raise HTTPException(
+            status_code=429,
+            detail="You've reached the message limit for this session. Please start a new chat.",
+        )
 
     cache_key = (session_id, user_message)
     if cache_key in response_cache:
@@ -228,6 +258,7 @@ async def chat_endpoint(chat_msg: ChatMessage, request: Request):
 
     ip_request_counts[client_ip].append(now)
     session_request_counts[session_id].append(now)
+    session_total_counts[session_id] += 1
 
     chatbot_instance = get_chatbot(session_id)
     try:
@@ -250,19 +281,40 @@ async def chat_stream_endpoint(chat_msg: ChatMessage, request: Request):
 
     now = time.time()
     ip_request_counts[client_ip] = [
-        t for t in ip_request_counts[client_ip] if now - t < 60
+        t for t in ip_request_counts[client_ip] if now - t < 600
     ]
     session_request_counts[session_id] = [
-        t for t in session_request_counts[session_id] if now - t < 5
+        t
+        for t in session_request_counts[session_id]
+        if now - t < RATE_LIMIT_SESSION_COOLDOWN
     ]
 
-    if len(ip_request_counts[client_ip]) >= 15:
-        raise HTTPException(status_code=429, detail="Too many requests from this IP.")
+    # Anti-spam checks
+    recent_1min = [t for t in ip_request_counts[client_ip] if now - t < 60]
+    if len(recent_1min) >= RATE_LIMIT_IP_PER_MINUTE:
+        raise HTTPException(
+            status_code=429,
+            detail="Slow down! Too many messages. Please wait a moment.",
+        )
+    if len(ip_request_counts[client_ip]) >= RATE_LIMIT_IP_PER_10MIN:
+        raise HTTPException(
+            status_code=429,
+            detail="You've sent a lot of messages. Please take a short break and try again.",
+        )
     if len(session_request_counts[session_id]) >= 1:
-        raise HTTPException(status_code=429, detail="One message every 5 seconds.")
+        raise HTTPException(
+            status_code=429,
+            detail=f"Please wait {RATE_LIMIT_SESSION_COOLDOWN} seconds between messages.",
+        )
+    if session_total_counts[session_id] >= RATE_LIMIT_SESSION_TOTAL:
+        raise HTTPException(
+            status_code=429,
+            detail="You've reached the message limit for this session. Please start a new chat.",
+        )
 
     ip_request_counts[client_ip].append(now)
     session_request_counts[session_id].append(now)
+    session_total_counts[session_id] += 1
 
     chatbot_instance = get_chatbot(session_id)
 
