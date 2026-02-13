@@ -102,8 +102,8 @@ class MCPChatbot:
             "city": None,  # e.g., "Jacksonville", "Gainesville"
             "state": None,  # e.g., "Florida", "FL"
         }
-        # Default home region for Miami Loves Green (used when no location detected)
-        self.default_region = "Miami, Florida"
+        # Default home region for Pinnacle AI
+        self.default_region = "Global"
         # ========== END LOCAL BUSINESS CONTEXT ==========
 
         # ========== PROFESSIONAL HARDENING (ADDITIVE) ==========
