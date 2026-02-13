@@ -106,7 +106,7 @@ class ImageGenerateRequest(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str
-    voice: str = "josh"
+    voice: Optional[str] = None
 
 
 @app.on_event("startup")

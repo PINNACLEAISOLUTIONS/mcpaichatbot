@@ -7,7 +7,7 @@ Designed for Render deployment with environment variables
 import os
 import logging
 import base64
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import httpx
 
 # Import Edge TTS (High-quality free fallback)
@@ -109,7 +109,7 @@ class VoiceAgent:
         }
 
     async def text_to_speech(
-        self, text: str, voice: str = "josh", return_base64: bool = True
+        self, text: str, voice: Optional[str] = None, return_base64: bool = True
     ) -> Dict[str, Any]:
         """
         Convert text to speech audio. -> ElevenLabs -> Edge TTS -> Google TTS
@@ -119,6 +119,10 @@ class VoiceAgent:
 
         # Clean text for voice (remove markdown, limit length)
         clean_text = self._clean_text_for_voice(text)
+
+        # Use default voice if not specified
+        if not voice:
+            voice = self.DEFAULT_VOICE
 
         if len(clean_text) > 5000:
             clean_text = clean_text[:5000] + "..."
