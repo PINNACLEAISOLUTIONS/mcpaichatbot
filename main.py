@@ -241,6 +241,46 @@ async def chat_endpoint(chat_msg: ChatMessage, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/chat/stream")
+async def chat_stream_endpoint(chat_msg: ChatMessage, request: Request):
+    """SSE streaming endpoint — tokens arrive in real-time."""
+    client_ip = request.client.host if request.client else "unknown"
+    session_id = chat_msg.session_id or str(uuid.uuid4())
+    user_message = chat_msg.message.strip()
+
+    now = time.time()
+    ip_request_counts[client_ip] = [
+        t for t in ip_request_counts[client_ip] if now - t < 60
+    ]
+    session_request_counts[session_id] = [
+        t for t in session_request_counts[session_id] if now - t < 5
+    ]
+
+    if len(ip_request_counts[client_ip]) >= 15:
+        raise HTTPException(status_code=429, detail="Too many requests from this IP.")
+    if len(session_request_counts[session_id]) >= 1:
+        raise HTTPException(status_code=429, detail="One message every 5 seconds.")
+
+    ip_request_counts[client_ip].append(now)
+    session_request_counts[session_id].append(now)
+
+    chatbot_instance = get_chatbot(session_id)
+
+    async def event_generator():
+        import json as _json
+
+        try:
+            async for chunk in chatbot_instance.send_message_stream(user_message):
+                yield chunk
+            # Send session_id as final metadata
+            yield f"data: {_json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
+        except Exception as e:
+            logger.error(f"Stream error: {e}")
+            yield f"data: {_json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 @app.get("/api/sessions")
 async def list_sessions():
     try:

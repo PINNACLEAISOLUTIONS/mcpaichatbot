@@ -1325,6 +1325,185 @@ class MCPChatbot:
             logger.error(f"Error in chat loop: {e}")
             return {"response": f"I encountered an error: {str(e)}"}
 
+    async def send_message_stream(self, user_message: str):
+        """
+        Streaming version of send_message(). Yields SSE-formatted chunks.
+        For lead capture / quick responses, yields the full text as one chunk.
+        For LLM responses, streams token-by-token.
+        """
+        import json as _json
+
+        self._last_image_data = None
+        if not self.conversation_history:
+            self.start_chat()
+
+        self.conversation_history.append({"role": "user", "content": user_message})
+
+        # Trim history (same as send_message)
+        max_history = 11
+        if len(self.conversation_history) > max_history:
+            system_msg = self.conversation_history[0]
+            self.conversation_history = [system_msg] + self.conversation_history[
+                -(max_history - 1) :
+            ]
+
+        # Auto-reset stale lead captures
+        if self.lead_state["active"] or self.lead_state["awaiting_permission"]:
+            if time.time() - self._lead_last_activity > self._lead_stale_seconds:
+                self.lead_state["active"] = False
+                self.lead_state["awaiting_permission"] = False
+                self.lead_state["field"] = None
+                self.lead_state["data"] = {}
+
+        # 1. Lead Capture (no streaming — return full response)
+        if self.lead_state["active"]:
+            self._lead_last_activity = time.time()
+            res = await self._process_lead_step(user_message)
+            yield f"data: {_json.dumps({'type': 'token', 'content': res})}\n\n"
+            yield f"data: {_json.dumps({'type': 'done', 'response': res})}\n\n"
+            return
+
+        # 2. Permission Request
+        if self.lead_state["awaiting_permission"]:
+            affirmative_keywords = [
+                "yes",
+                "sure",
+                "ok",
+                "yeah",
+                "yep",
+                "proceed",
+                "go ahead",
+                "fine",
+            ]
+            negative_keywords = ["no", "nope", "not now", "later", "cancel"]
+            msg_lower = user_message.lower()
+            if any(kw in msg_lower for kw in affirmative_keywords):
+                res = await self._start_lead_capture()
+            elif any(kw in msg_lower for kw in negative_keywords):
+                res = (
+                    "No problem! Feel free to ask me any questions about our services."
+                )
+            else:
+                res = (
+                    "I didn't quite catch that. Would you like me to proceed? (yes/no)"
+                )
+            yield f"data: {_json.dumps({'type': 'token', 'content': res})}\n\n"
+            yield f"data: {_json.dumps({'type': 'done', 'response': res})}\n\n"
+            return
+
+        # 3. Quote Intent
+        if self._detect_quote_intent(user_message):
+            res = await self._request_quote_permission()
+            yield f"data: {_json.dumps({'type': 'token', 'content': res})}\n\n"
+            yield f"data: {_json.dumps({'type': 'done', 'response': res})}\n\n"
+            return
+
+        # Location + KB
+        self._detect_location(user_message)
+        location_context = self._get_location_context_prompt()
+        kb_response = await self._lookup_business_knowledge(user_message)
+
+        if kb_response:
+            current_system = (
+                self.system_instruction
+                + f"\n\n{location_context}\n\nCONTEXT FROM BUSINESS KNOWLEDGE PACK:\n{kb_response}"
+            )
+        else:
+            current_system = self.system_instruction + f"\n\n{location_context}"
+
+        # Time context
+        time_context = (
+            f"\n\n[Current Time: {datetime.now().strftime('%Y-%m-%d %H:%M %Z')}]"
+        )
+
+        # Build messages for completion
+        messages = self.conversation_history.copy()
+        messages = [m for m in messages if m.get("role") != "system"]
+        messages.insert(0, {"role": "system", "content": current_system + time_context})
+
+        # Stream LLM completion
+        try:
+            full_response = ""
+            async for chunk_text in self._get_completion_stream(messages=messages):
+                full_response += chunk_text
+                yield f"data: {_json.dumps({'type': 'token', 'content': chunk_text})}\n\n"
+
+            # Save to history
+            self.conversation_history.append(
+                {"role": "assistant", "content": full_response}
+            )
+            self.save_history()
+            yield f"data: {_json.dumps({'type': 'done', 'response': full_response})}\n\n"
+
+        except Exception as e:
+            error_msg = f"I encountered an error: {str(e)}"
+            yield f"data: {_json.dumps({'type': 'error', 'content': error_msg})}\n\n"
+
+    async def _get_completion_stream(self, messages=None):
+        """
+        Streaming version of _get_completion. Yields text chunks.
+        Uses the same fallback chain but with stream=True.
+        """
+        if messages is None:
+            messages = self.conversation_history.copy()
+        else:
+            messages = messages.copy()
+
+        # Build fallback chain (same as _get_completion)
+        fallback_chain = []
+        if self.groq_api_key:
+            fallback_chain.append("groq/llama-3.3-70b-versatile")
+            fallback_chain.append("groq/llama-3.1-8b-instant")
+        if self.gemini_api_key:
+            fallback_chain.append("gemini/gemini-2.5-flash")
+            fallback_chain.append("gemini/gemini-2.5-pro")
+            fallback_chain.append("gemini/gemini-2.0-flash")
+            fallback_chain.append("gemini/gemini-2.0-flash-lite")
+        if not fallback_chain:
+            fallback_chain = ["groq/llama-3.3-70b-versatile"]
+
+        seen = set()
+        unique_chain = [x for x in fallback_chain if not (x in seen or seen.add(x))]
+
+        for model_name in unique_chain:
+            try:
+                completion_kwargs = {
+                    "model": model_name,
+                    "messages": messages,
+                    "max_tokens": 512,
+                    "temperature": 0.7,
+                    "stream": True,
+                }
+                if model_name.startswith("gemini/") and self.gemini_api_key:
+                    completion_kwargs["api_key"] = self.gemini_api_key
+                elif model_name.startswith("groq/") and self.groq_api_key:
+                    completion_kwargs["api_key"] = self.groq_api_key
+
+                response = await litellm.acompletion(**completion_kwargs)
+                got_content = False
+                async for chunk in response:
+                    delta = chunk.choices[0].delta if chunk.choices else None
+                    if delta and delta.content:
+                        got_content = True
+                        yield delta.content
+
+                if got_content:
+                    return  # Success — stop trying other models
+
+            except Exception as e:
+                error_msg = str(e)
+                if "429" in error_msg or "quota" in error_msg.lower():
+                    logger.warning(
+                        f"Stream: {model_name} rate limited, trying next model"
+                    )
+                    continue
+                else:
+                    logger.error(f"Stream: {model_name} error: {e}")
+                    continue
+
+        # If all models failed, yield error
+        yield "I'm experiencing high demand right now. Please try again in a moment."
+
     async def _get_completion(
         self, tools=None, max_retries=2, system_override=None, messages=None
     ):

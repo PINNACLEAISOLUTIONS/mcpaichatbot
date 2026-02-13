@@ -217,20 +217,106 @@ document.addEventListener('DOMContentLoaded', () => {
         userInput.style.height = 'auto';
         sendBtn.disabled = true;
         const loader = showTypingIndicator();
+
         try {
-            const resp = await fetch(`${API_BASE}/api/chat`, {
+            const resp = await fetch(`${API_BASE}/api/chat/stream`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: text, session_id: currentSessionId })
             });
-            const data = await resp.json();
+
             loader.remove();
-            if (data.response) {
-                const botText = typeof data.response === 'string' ? data.response : data.response.response;
-                const msgId = addBotMessage(botText, data);
-                if (autoSpeak && msgId) { if (voiceModeActive) speakWithElevenLabs(botText, msgId); else speakTextBrowser(botText, msgId); }
-                if (data.session_id) { currentSessionId = data.session_id; localStorage.setItem('chatbot_session_id', data.session_id); updateHistory(); }
+
+            if (!resp.ok || !resp.body) {
+                // Fallback to non-streaming endpoint
+                const fallResp = await fetch(`${API_BASE}/api/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text, session_id: currentSessionId })
+                });
+                const data = await fallResp.json();
+                if (data.response) {
+                    const botText = typeof data.response === 'string' ? data.response : data.response.response;
+                    const msgId = addBotMessage(botText, data);
+                    if (autoSpeak && msgId) { if (voiceModeActive) speakWithElevenLabs(botText, msgId); else speakTextBrowser(botText, msgId); }
+                    if (data.session_id) { currentSessionId = data.session_id; localStorage.setItem('chatbot_session_id', data.session_id); updateHistory(); }
+                }
+                sendBtn.disabled = false;
+                return;
             }
+
+            // Create bot message div for streaming
+            const msgId = `msg-${++messageIdCounter}`;
+            const div = document.createElement('div');
+            div.className = 'message assistant-message';
+            div.setAttribute('data-msg-id', msgId);
+            div.innerHTML = `
+                <div class="message-content"><span class="streaming-cursor">▊</span></div>
+                <div class="message-actions" style="display:none;">
+                    <button class="speak-btn" title="Speak message">${getSpeakerIcon()}</button>
+                </div>
+            `;
+            chatMessages.appendChild(div);
+            scrollToBottom();
+
+            const contentDiv = div.querySelector('.message-content');
+            const actionsDiv = div.querySelector('.message-actions');
+            let accumulated = '';
+            let finalResponse = '';
+
+            // Read SSE stream
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Keep incomplete line in buffer
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    try {
+                        const payload = JSON.parse(line.slice(6));
+                        if (payload.type === 'token') {
+                            accumulated += payload.content;
+                            contentDiv.innerHTML = marked.parse(accumulated) + '<span class="streaming-cursor">▊</span>';
+                            scrollToBottom();
+                        } else if (payload.type === 'done') {
+                            finalResponse = payload.response || accumulated;
+                        } else if (payload.type === 'session') {
+                            if (payload.session_id) {
+                                currentSessionId = payload.session_id;
+                                localStorage.setItem('chatbot_session_id', payload.session_id);
+                                updateHistory();
+                            }
+                        } else if (payload.type === 'error') {
+                            accumulated = payload.content || 'An error occurred.';
+                        }
+                    } catch (parseErr) { /* skip malformed SSE lines */ }
+                }
+            }
+
+            // Finalize message
+            const displayText = finalResponse || accumulated;
+            contentDiv.innerHTML = marked.parse(displayText);
+            actionsDiv.style.display = '';
+            div.querySelector('.speak-btn').addEventListener('click', () => {
+                if (isSpeaking && currentSpeakingMsgId === msgId) stopSpeaking();
+                else if (voiceModeActive) speakWithElevenLabs(displayText, msgId);
+                else speakTextBrowser(displayText, msgId);
+            });
+            scrollToBottom();
+
+            // Auto-speak after stream completes
+            if (autoSpeak && msgId) {
+                if (voiceModeActive) speakWithElevenLabs(displayText, msgId);
+                else speakTextBrowser(displayText, msgId);
+            }
+
         } catch (err) { loader.remove(); addErrorMessage("Connection failed."); }
         sendBtn.disabled = false;
     }

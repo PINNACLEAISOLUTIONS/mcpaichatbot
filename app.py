@@ -8,7 +8,7 @@ from mcp_client_manager import MCPClientManager
 from chatbot import MCPChatbot
 
 from hf_inference_client import HFInferenceClient
-from pollinations_client import PollinationsImageClient
+from pollinations_client import PollinationsClient
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -48,7 +48,7 @@ async def main():
         await hf_inference.start()
 
         # Initialize Pollinations Client (Unlimited free images)
-        pollinations_client = PollinationsImageClient()
+        pollinations_client = PollinationsClient()
         await pollinations_client.start()
 
         # Initialize chatbot
