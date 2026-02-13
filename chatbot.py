@@ -709,6 +709,28 @@ class MCPChatbot:
         # Limit to max 10 tools to keep context sane
         relevant_tools = list(set(relevant_tools))[:10]
 
+        # CONTACT / EMAIL / LEAD CAPTURE - Always check last
+        if any(
+            kw in message_lower
+            for kw in [
+                "contact",
+                "email",
+                "message",
+                "hire",
+                "project",
+                "discuss",
+                "quote",
+                "inquiry",
+                "send to team",
+                "notify team",
+                "get in touch",
+                "call me",
+                "reach out",
+            ]
+        ):
+            relevant_tools.append("send_lead_email")
+            logger.info("DEBUG: Routing to LEAD CAPTURE tool")
+
         if relevant_tools:
             logger.info(f"Sending only {len(relevant_tools)} tool(s): {relevant_tools}")
         else:
@@ -790,7 +812,6 @@ class MCPChatbot:
             if not mcp_tools:
                 return None
 
-        openai_tools = []
         seen_functions = set()
         for tool in mcp_tools:
             # SPECIAL CASE: 'generate_image' should NOT have a prefix to keep it simple
