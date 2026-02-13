@@ -52,11 +52,21 @@ class MCPClientManager:
 
     async def connect_to_servers(self) -> None:
         """Connect to all configured MCP servers"""
+        import asyncio
+
         servers = self.config.get("mcpServers", {})
 
         for server_name, server_config in servers.items():
             try:
-                await self._connect_server(server_name, server_config)
+                await asyncio.wait_for(
+                    self._connect_server(server_name, server_config),
+                    timeout=15.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"MCP server '{server_name}' connection timed out after 15s — skipping"
+                )
+                continue
             except Exception as e:
                 logger.error(f"Failed to connect to MCP server '{server_name}': {e}")
                 # Continue with other servers even if one fails

@@ -40,4 +40,4 @@ ENV PORT=8000
 EXPOSE 8000
 
 # Start command
-CMD gunicorn main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
+CMD gunicorn main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120 --workers 1
