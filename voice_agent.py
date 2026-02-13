@@ -37,7 +37,7 @@ class VoiceAgent:
         "adam": "pNInz6obpgDQGcFmaJgB",  # Deep male
         "antoni": "ErXwobaYiN019PkySvjV",  # Antoni (Deep, well rounded)
     }
-    DEFAULT_VOICE = "miami"
+    DEFAULT_VOICE = "antoni"
 
     # Edge TTS Voice Map
     EDGE_VOICES = {
