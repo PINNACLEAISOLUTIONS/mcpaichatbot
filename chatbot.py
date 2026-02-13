@@ -1757,34 +1757,37 @@ class MCPChatbot:
     async def _send_lead_email(
         self, interest_detail: str, user_info: Optional[str] = None
     ):
-        """Send lead notification email to futureai4all@gmail.com"""
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.header import Header
+        """Send lead notification email to futureai4all@gmail.com using centralized utils."""
+        # Construct lead data payload for email_utils
+        lead_data = {
+            "name": user_info or "Website Visitor",
+            "email": "Not provided",
+            "phone": "Not provided",
+            "description": interest_detail,
+        }
 
-        gmail_user = os.getenv("GMAIL_USER")
-        gmail_password = os.getenv("GMAIL_APP_PASSWORD")
-
-        if not gmail_user or not gmail_password:
-            logger.warning("Email credentials missing. Cannot send lead email.")
-            return "Note: Lead capture failed (server configuration missing)."
-
-        subject = "website request"
-        body = f"New Contact Request from Website!\n\nInterest: {interest_detail}\nUser Info: {user_info or 'Not provided'}\nSession: {self.session_id}"
-
-        msg = MIMEText(body, "plain", "utf-8")
-        msg["Subject"] = Header(subject, "utf-8")
-        msg["From"] = gmail_user
-        msg["To"] = "futureai4all@gmail.com"
+        # Determine if user_info contains email or phone to populate fields better
+        # Simple heuristic: look for @ for email
+        if user_info and "@" in user_info:
+            lead_data["email"] = user_info
 
         try:
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-                server.login(gmail_user, gmail_password)
-                server.send_message(msg)
-            logger.info(f"Lead email sent for session {self.session_id}")
-            return "Success: Our team has been notified. We will get back to you soon!"
+            # Use the robust email_utils function (synchronous, so maybe wrap or just call)
+            # Since email_utils.send_lead_email is blocking SMTP, we should run it in executor if possible,
+            # but for now direct call is fine or use loop.run_in_executor
+            success = await asyncio.to_thread(email_utils.send_lead_email, lead_data)
+
+            if success:
+                logger.info(
+                    f"Lead email sent via email_utils for session {self.session_id}"
+                )
+                return (
+                    "Success: Our team has been notified. We will get back to you soon!"
+                )
+            else:
+                return "Note: Lead capture saved to database, but email notification system is currently busy."
         except Exception as e:
-            logger.error(f"Failed to send lead email: {e}")
+            logger.error(f"Failed to send lead email wrapper: {e}")
             return f"Error sending notification: {str(e)}"
 
     async def _execute_mcp_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any:

@@ -61,6 +61,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         recognition.onresult = (event) => {
+            // BARGE-IN: Stop speaking immediately if any speech is detected (even interim)
+            if (isSpeaking) {
+                console.log("Barge-in detected (speech started)");
+                stopSpeaking();
+            }
+
             let finalTranscript = '';
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
@@ -196,13 +202,25 @@ document.addEventListener('DOMContentLoaded', () => {
         hdToggleBtn.classList.toggle('hd-active', useHDMode);
     });
     if (autoSpeakToggle) autoSpeakToggle.addEventListener('change', e => { autoSpeak = e.target.checked; });
-    if (voiceModeBtn) voiceModeBtn.addEventListener('click', () => {
+    if (voiceModeBtn) voiceModeBtn.addEventListener('click', (e) => {
+        e.preventDefault(); // Prevent accidental double-taps or focus issues
+        console.log("Voice Mode Button Clicked");
+
         voiceModeActive = !voiceModeActive;
         voiceModeBtn.classList.toggle('active', voiceModeActive);
         autoSpeak = voiceModeActive;
+
+        // Visual feedback
+        voiceModeBtn.style.transform = "scale(0.95)";
+        setTimeout(() => voiceModeBtn.style.transform = "scale(1)", 100);
+
         if (autoSpeakToggle) autoSpeakToggle.checked = autoSpeak;
-        if (voiceModeActive) speakWithElevenLabs("Pinnacle AI Voice Mode active. How can I assist with your project?", null);
-        else stopSpeaking();
+
+        if (voiceModeActive) {
+            speakWithElevenLabs("Pinnacle AI Voice Mode active. How can I assist with your project?", null);
+        } else {
+            stopSpeaking();
+        }
     });
 
     userInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
