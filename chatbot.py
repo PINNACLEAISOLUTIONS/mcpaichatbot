@@ -1,4 +1,4 @@
-"""AI Chatbot for Miami Loves Green Landscaping"""
+"""AI Chatbot for Pinnacle AI Solutions Expert Systems"""
 
 import json
 import logging
@@ -134,8 +134,8 @@ class MCPChatbot:
             "### YOUR BEHAVIOR:\n"
             "- **Ask Questions**: When a user mentions a need, ask clarifying questions to provide expert ideas.\n"
             "- **Be Professional**: Use clear, concise, and technically accurate language.\n"
-            "- **Lead Capture**: When a user wants to CONTACT you or start a project, "
-            "you MUST call the 'send_lead_email' tool and notify the experts."
+            "- **Lead Capture**: When a user wants to CONTACT you, inquires about our services, or wants to start a project, "
+            "you MUST proactively offer to notify our experts and call the 'send_lead_email' tool."
         )
 
         # Session management
@@ -188,13 +188,13 @@ class MCPChatbot:
         return any(kw in msg_lower for kw in keywords)
 
     async def _request_quote_permission(self) -> str:
-        """Ask for permission to collect info and email Miami Loves Green."""
+        """Ask for permission to collect info and email the Pinnacle AI Team."""
         self.lead_state["awaiting_permission"] = True
         return (
-            "I'd be happy to help you get a personalized quote! \n\n"
-            "**Please allow me to email the Miami Loves Green Landscaping Team with your project details**, "
-            "and I'll collect some quick information to get you an accurate estimate for your specific needs.\n\n"
-            "May I proceed with collecting your information? (Just say 'yes' or 'sure' to continue)"
+            "I'd be happy to help you get started with a professional inquiry! \n\n"
+            "**Please allow me to email the Pinnacle AI Solutions Expert Team with your project details**, "
+            "and I'll collect some brief information to ensure we get back to you with the right expertise.\n\n"
+            "May I proceed with collecting your details? (Just say 'yes' or 'sure' to continue)"
         )
 
     async def _start_lead_capture(self) -> str:
