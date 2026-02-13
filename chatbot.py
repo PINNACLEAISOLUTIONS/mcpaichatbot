@@ -1,6 +1,5 @@
 """AI Chatbot for Miami Loves Green Landscaping"""
 
-import base64
 import json
 import logging
 import os
