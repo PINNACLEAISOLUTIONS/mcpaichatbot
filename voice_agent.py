@@ -10,6 +10,12 @@ import base64
 from typing import Dict, Any
 import httpx
 
+# Import Edge TTS (High-quality free fallback)
+try:
+    import edge_tts
+except ImportError:
+    edge_tts = None
+
 # Import ElevenLabs SDK
 try:
     from elevenlabs.client import AsyncElevenLabs
@@ -20,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class VoiceAgent:
-    """Text-to-Speech agent with ElevenLabs primary and Google fallback."""
+    """Text-to-Speech agent with ElevenLabs primary, Edge TTS secondary, and Google fallback."""
 
     # ElevenLabs voice IDs (free tier compatible)
     VOICES = {
@@ -32,6 +38,16 @@ class VoiceAgent:
         "antoni": "ErXwobaYiN019PkySvjV",  # Antoni (Deep, well rounded)
     }
     DEFAULT_VOICE = "miami"
+
+    # Edge TTS Voice Map
+    EDGE_VOICES = {
+        "miami": "en-US-ChristopherNeural",  # Business professional
+        "josh": "en-US-GuyNeural",  # Friendly male (OpenAI Cove equivalent)
+        "rachel": "en-US-AriaNeural",  # Professional female
+        "bella": "en-US-MichelleNeural",  # Young female
+        "adam": "en-US-EricNeural",  # Deep male
+        "antoni": "en-US-ChristopherNeural",  # Deep business
+    }
 
     def __init__(self):
         """Initialize voice agent with API keys from environment."""
@@ -67,20 +83,26 @@ class VoiceAgent:
             self.client = None
             logger.warning("⚠️ ElevenLabs API key NOT found. Using fallback only.")
 
+        if edge_tts:
+            logger.info("✅ Edge TTS initialized (High-quality free fallback ready)")
+        else:
+            logger.warning("⚠️ Edge TTS not found. Fallback quality will be lower.")
+
         if self.google_tts_api_key:
-            logger.info("✅ Google TTS/Gemini key loaded (fallback ready)")
+            logger.info("✅ Google TTS/Gemini key loaded (tertiary fallback)")
         else:
             logger.warning("⚠️ No Google/ElevenLabs keys found for server-side TTS")
 
     @property
     def is_available(self) -> bool:
         """Check if any TTS service is available."""
-        return bool(self.elevenlabs_api_key or self.google_tts_api_key)
+        return bool(self.elevenlabs_api_key or edge_tts or self.google_tts_api_key)
 
     def get_status(self) -> Dict[str, Any]:
         """Return TTS service status."""
         return {
             "elevenlabs_enabled": bool(self.elevenlabs_api_key),
+            "edge_tts_enabled": bool(edge_tts),
             "google_tts_enabled": bool(self.google_tts_api_key),
             "available": self.is_available,
             "default_voice": self.DEFAULT_VOICE,
@@ -90,15 +112,7 @@ class VoiceAgent:
         self, text: str, voice: str = "josh", return_base64: bool = True
     ) -> Dict[str, Any]:
         """
-        Convert text to speech audio.
-
-        Args:
-            text: Text to convert to speech
-            voice: Voice ID or name (rachel, josh, bella, adam)
-            return_base64: If True, return base64 encoded audio
-
-        Returns:
-            Dict with success status and audio data or error
+        Convert text to speech audio. -> ElevenLabs -> Edge TTS -> Google TTS
         """
         if not text or not text.strip():
             return {"success": False, "error": "No text provided"}
@@ -110,24 +124,60 @@ class VoiceAgent:
             clean_text = clean_text[:5000] + "..."
             logger.warning("Text truncated to 5000 chars for TTS")
 
-        # Try ElevenLabs first
+        # 1. Try ElevenLabs
         elevenlabs_error = None
         if self.elevenlabs_api_key:
             result = await self._elevenlabs_tts(clean_text, voice, return_base64)
             if result.get("success"):
                 return result
             elevenlabs_error = result.get("error", "Unknown ElevenLabs error")
-            logger.warning(f"ElevenLabs failed: {elevenlabs_error}. Trying Google...")
+            logger.warning(f"ElevenLabs failed: {elevenlabs_error}. Trying Edge TTS...")
 
-        # Fallback to Google TTS
+        # 2. Try Edge TTS (High Quality Free Fallback)
+        edge_error = None
+        if edge_tts:
+            result = await self._edge_tts_generate(clean_text, voice, return_base64)
+            if result.get("success"):
+                logger.info("✅ Served audio via Edge TTS fallback")
+                return result
+            edge_error = result.get("error")
+            logger.warning(f"Edge TTS failed: {edge_error}. Trying Google...")
+
+        # 3. Fallback to Google TTS
         if self.google_tts_api_key:
             return await self._google_tts(clean_text, return_base64)
 
-        # Return actual error from ElevenLabs if available
-        if elevenlabs_error:
-            return {"success": False, "error": f"ElevenLabs failed: {elevenlabs_error}"}
+        # Return relevant error
+        final_error = elevenlabs_error or edge_error or "No TTS providers available"
+        return {"success": False, "error": f"All TTS failed. Last error: {final_error}"}
 
-        return {"success": False, "error": "No TTS API keys configured"}
+    async def _edge_tts_generate(
+        self, text: str, voice: str, return_base64: bool
+    ) -> Dict[str, Any]:
+        """Generate speech using Microsoft Edge TTS (Free, high quality)."""
+        try:
+            # Map simplified voice name to Edge voice ID
+            edge_voice = self.EDGE_VOICES.get(voice.lower(), "en-US-GuyNeural")
+            communicate = edge_tts.Communicate(text, edge_voice)
+
+            # Accumulate audio bytes
+            audio_data = b""
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    audio_data += chunk["data"]
+
+            if return_base64:
+                b64_audio = base64.b64encode(audio_data).decode("utf-8")
+                return {
+                    "success": True,
+                    "audio_base64": b64_audio,
+                    "content_type": "audio/mpeg",  # Edge returns mp3 by default
+                    "provider": "edge-tts",
+                }
+            return {"success": True, "audio": audio_data, "content_type": "audio/mpeg"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     def _clean_text_for_voice(self, text: str) -> str:
         """Remove markdown and format text for natural speech."""
