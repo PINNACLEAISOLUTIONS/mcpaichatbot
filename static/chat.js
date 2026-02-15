@@ -202,24 +202,39 @@ document.addEventListener('DOMContentLoaded', () => {
         hdToggleBtn.classList.toggle('hd-active', useHDMode);
     });
     if (autoSpeakToggle) autoSpeakToggle.addEventListener('change', e => { autoSpeak = e.target.checked; });
-    if (voiceModeBtn) voiceModeBtn.addEventListener('click', (e) => {
-        e.preventDefault(); // Prevent accidental double-taps or focus issues
-        console.log("Voice Mode Button Clicked");
+    let voiceBtnCooldown = false;
+    if (voiceModeBtn) voiceModeBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (voiceBtnCooldown) return;
 
+        voiceBtnCooldown = true;
         voiceModeActive = !voiceModeActive;
+
+        // Premium Visual Feedback
+        voiceModeBtn.classList.add('working');
         voiceModeBtn.classList.toggle('active', voiceModeActive);
         autoSpeak = voiceModeActive;
-
-        // Visual feedback
-        voiceModeBtn.style.transform = "scale(0.95)";
-        setTimeout(() => voiceModeBtn.style.transform = "scale(1)", 100);
-
         if (autoSpeakToggle) autoSpeakToggle.checked = autoSpeak;
 
-        if (voiceModeActive) {
-            speakWithElevenLabs("Pinnacle AI Voice Mode active. How can I assist with your project?", null);
-        } else {
-            stopSpeaking();
+        console.log(`Voice Mode: ${voiceModeActive ? 'Enabling' : 'Disabling'}`);
+
+        try {
+            if (voiceModeActive) {
+                // Ensure we stop any existing audio first
+                stopSpeaking();
+                // Activation handshake
+                await speakWithElevenLabs("Pinnacle AI Voice Mode active. How can I assist?", null);
+            } else {
+                stopSpeaking();
+                stopListening();
+            }
+        } catch (err) {
+            console.error("Voice Mode Toggle Error:", err);
+        } finally {
+            setTimeout(() => {
+                voiceModeBtn.classList.remove('working');
+                voiceBtnCooldown = false;
+            }, 800); // 800ms debounce
         }
     });
 
