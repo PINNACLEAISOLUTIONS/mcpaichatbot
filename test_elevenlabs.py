@@ -27,7 +27,7 @@ async def test_elevenlabs_connection():
     print(f"✅ STATUS: Key found (starts with: {api_key[:5]}...)")
 
     try:
-        from elevenlabs.client import ElevenLabs
+        from elevenlabs.client import ElevenLabs  # type: ignore
 
         client = ElevenLabs(api_key=api_key)
 
