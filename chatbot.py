@@ -1443,9 +1443,17 @@ class MCPChatbot:
         # Stream LLM completion
         try:
             full_response = ""
+            # HEARTBEAT: Start a background task to yield pings if tokens are slow
+            # We use a simple counter approach instead of nested background tasks for SSE safety
+            token_count = 0
             async for chunk_text in self._get_completion_stream(messages=messages):
+                token_count += 1
                 full_response += chunk_text
                 yield f"data: {_json.dumps({'type': 'token', 'content': chunk_text})}\n\n"
+
+                # Yield a heartbeat comment every 30 tokens to keep connection warm
+                if token_count % 30 == 0:
+                    yield ": heartbeat\n\n"
 
             # Save to history
             self.conversation_history.append(

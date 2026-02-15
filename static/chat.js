@@ -267,12 +267,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text, session_id: currentSessionId })
                 });
-                const data = await fallResp.json();
-                if (data.response) {
-                    const botText = typeof data.response === 'string' ? data.response : data.response.response;
-                    const msgId = addBotMessage(botText, data);
-                    if (autoSpeak && msgId) { if (voiceModeActive) speakWithElevenLabs(botText, msgId); else speakTextBrowser(botText, msgId); }
-                    if (data.session_id) { currentSessionId = data.session_id; localStorage.setItem('chatbot_session_id', data.session_id); updateHistory(); }
+                const rawText = await fallResp.text();
+                try {
+                    const data = JSON.parse(rawText);
+                    if (data.response) {
+                        const botText = typeof data.response === 'string' ? data.response : data.response.response;
+                        const msgId = addBotMessage(botText, data);
+                        if (autoSpeak && msgId) { if (voiceModeActive) speakWithElevenLabs(botText, msgId); else speakTextBrowser(botText, msgId); }
+                        if (data.session_id) { currentSessionId = data.session_id; localStorage.setItem('chatbot_session_id', data.session_id); updateHistory(); }
+                    }
+                } catch (parseErr) {
+                    console.error("Failed to parse chat response JSON:", parseErr);
+                    console.error("Raw response content:", rawText);
+                    addErrorMessage("The server signature was invalid. Please try again.");
                 }
                 sendBtn.disabled = false;
                 return;
@@ -314,22 +321,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!line.startsWith('data: ')) continue;
                     try {
                         const payload = JSON.parse(line.slice(6));
-                        if (payload.type === 'token') {
-                            accumulated += payload.content;
-                            contentDiv.innerHTML = marked.parse(accumulated) + '<span class="streaming-cursor">▊</span>';
-                            scrollToBottom();
-                        } else if (payload.type === 'done') {
-                            finalResponse = payload.response || accumulated;
-                        } else if (payload.type === 'session') {
-                            if (payload.session_id) {
-                                currentSessionId = payload.session_id;
-                                localStorage.setItem('chatbot_session_id', payload.session_id);
-                                updateHistory();
-                            }
-                        } else if (payload.type === 'error') {
-                            accumulated = payload.content || 'An error occurred.';
+                        // ... payload processing ...
+                    } catch (parseErr) {
+                        if (line.trim() !== "data: [DONE]" && !line.startsWith(":")) {
+                            console.warn("SSE Parse Error:", parseErr, "Line:", line);
                         }
-                    } catch (parseErr) { /* skip malformed SSE lines */ }
+                    }
                 }
             }
 

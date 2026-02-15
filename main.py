@@ -10,8 +10,9 @@ from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv  # type: ignore
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File  # type: ignore
 from fastapi.staticfiles import StaticFiles  # type: ignore
-from fastapi.responses import FileResponse, StreamingResponse  # type: ignore
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
+from fastapi.exceptions import RequestValidationError  # type: ignore
 from pydantic import BaseModel  # type: ignore
 import time
 import asyncio
@@ -57,6 +58,30 @@ async def add_iframe_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "ALLOWALL"
     response.headers["Content-Security-Policy"] = "frame-ancestors *"
     return response
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Ensure validation errors return JSON."""
+    logger.error(f"Validation error: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "message": "Invalid request format"},
+    )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global handler to ensure ALL errors return JSON, never raw HTML/text."""
+    logger.error(f"Global error: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": str(exc),
+            "type": type(exc).__name__,
+            "message": "An internal server error occurred.",
+        },
+    )
 
 
 # Global state
@@ -255,8 +280,12 @@ async def chat_endpoint(chat_msg: ChatMessage, request: Request):
     cache_key = (session_id, user_message)
     if cache_key in response_cache:
         cached_data = response_cache[cache_key]
-        if now - cached_data["timestamp"] < CACHE_TTL:
-            return {**cached_data["data"], "session_id": session_id, "cached": True}
+        if (
+            isinstance(cached_data, dict)
+            and now - cached_data.get("timestamp", 0) < CACHE_TTL
+        ):
+            data = cached_data.get("data", {})
+            return {**data, "session_id": session_id, "cached": True}
 
     ip_request_counts[client_ip].append(now)
     session_request_counts[session_id].append(now)
