@@ -50,7 +50,7 @@ class PinnacleChatbot:
         """
         Initialize the chatbot with an MCP manager and session ID.
         """
-        self.mcp_manager = None
+        
 
         # Initialize clients
         self.hf_client = None
@@ -518,169 +518,26 @@ class PinnacleChatbot:
         ]
         logger.info("Chat session reset.")
 
-    def _get_relevant_tools(self, user_message: str) -> List[str]:
-        """
-        Determine which specific tools are relevant based on keywords.
-        Returns a list of tool names to include.
-        Returns empty list for no tools (simple chat) - saves tokens!
-        """
-        message_lower = user_message.lower()
-        relevant_tools = []
-
-        # IMAGE GENERATION - Only when user explicitly asks for image/picture/logo
-        # Uses FREE Gemini 2.0 Flash
-        image_request = any(
-            kw in message_lower
-            for kw in [
-                "image",
-                "picture",
-                "photo",
-                "draw",
-                "logo",
-                "icon",
-                "illustration",
-                "pattern",
-                "background",
-                "diagram",
-                "flowchart",
-                "story",
-                "sequence",
-                "edit",
-                "modify",
-                "restore",
-                "enhance",
-            ]
-        )
-        if image_request:
-            # Only send ONE primary image tool name to avoid LLM confusion
-            relevant_tools.append("generate_image")
-            logger.info("DEBUG: Routing to image/design tools")
-            # ========== PROFESSIONAL HARDENING ==========
-            # When image is requested, skip web search to reduce token usage
-            # and avoid confusing the model with multiple tool options
-            # ========== END PROFESSIONAL HARDENING ==========
-
-        # WEB SEARCH - For real internet searches (attorneys, businesses, news, etc.)
-        # Skip if image request to avoid token waste (professional hardening)
-        if not image_request and (
-            any(
-                kw in message_lower
-                for kw in [
-                    "search",
-                    "find",
-                    "look up",
-                    "lookup",
-                    "attorney",
-                    "lawyer",
-                    "news",
-                    "weather",
-                    "price",
-                    "review",
-                    "jacksonville",
-                    "browse",
-                    "google",
-                    "check",
-                    "internet",
-                    "online",
-                    "latest",
-                    "current",
-                ]
-            )
-            or (
-                any(
-                    kw in message_lower
-                    for kw in ["who is", "what is", "when is", "where is", "how to"]
-                )
-                and not any(
-                    factual in message_lower
-                    for factual in [
-                        "capital of",
-                        "capitol of",
-                        "math",
-                        "square root",
-                        "plus",
-                        "minus",
-                        "divided by",
-                        "multiplied by",
-                    ]
-                )
-                and len(user_message.split())
-                > 5  # Simple short "What is X" is usually factual
-            )
-        ):
-            # Use DuckDuckGo web search MCP
-            relevant_tools.append("websearch_search")
-            logger.info("DEBUG: Routing to WEB SEARCH (DuckDuckGo)")
-
-        # Hugging Face Discovery - ONLY for AI model/space specific searches
-        if any(
-            kw in message_lower
-            for kw in ["huggingface", "hf model", "hf space", "ai model", "ml model"]
-        ):
-            relevant_tools.extend(
-                ["space_search", "model_search", "get_model_info", "list_spaces"]
-            )
-
-        # Memory - only if explicit memory keywords
-        if any(
-            kw in message_lower
-            for kw in ["remember", "recall", "memory", "fact", "note"]
-        ):
-            relevant_tools.append("create_entities")
-
-        # AutoAgent - agent, code, execute, task
-        if any(
-            kw in message_lower
-            for kw in [
-                "agent",
-                "autoagent",
-                "profile",
-                "python",
-                "script",
-                "code",
-                "execute",
-                "task",
-            ]
-        ):
-            relevant_tools.extend(["list_autoagent_profiles", "run_autoagent_task"])
-
-        # Limit to max 10 tools to keep context sane
-        relevant_tools = list(set(relevant_tools))[:10]
-
-        # CONTACT / EMAIL / LEAD CAPTURE - Always check last
-        if any(
-            kw in message_lower
-            for kw in [
-                "contact",
-                "email",
-                "message",
-                "hire",
-                "project",
-                "discuss",
-                "quote",
-                "inquiry",
-                "send to team",
-                "notify team",
-                "get in touch",
-                "call me",
-                "reach out",
-            ]
-        ):
-            relevant_tools.append("send_lead_email")
-            logger.info("DEBUG: Routing to LEAD CAPTURE tool")
-
-        if relevant_tools:
-            logger.info(f"Sending only {len(relevant_tools)} tool(s): {relevant_tools}")
-        else:
-            logger.info("No tools needed for this query (saving tokens)")
-
-        return relevant_tools
+        def _get_relevant_tools(self, user_message: str) -> List[str]:
+        """Determine which specific tools are relevant based on keywords."""
+        msg = user_message.lower()
+        tools = []
+        
+        # Image Generation
+        if any(kw in msg for kw in ["image", "picture", "photo", "draw", "logo", "icon", "design"]):
+            tools.append("generate_image")
+            
+        # Lead Capture
+        if any(kw in msg for kw in ["contact", "email", "message", "hire", "project", "quote", "discuss", "call me"]):
+            tools.append("send_lead_email")
+            
+        return tools
 
     async def _format_tools_for_litellm(
         self, tool_filter: Optional[List[str]] = None
     ) -> Optional[List[Dict[str, Any]]]:
         """Format MCP tools for LiteLLM with EXTREME token saving"""
-        mcp_tools = self.mcp_manager.get_all_tools().copy()
+        mcp_tools = None.get_all_tools().copy()
 
         # Add Hugging Face MCP tools if client is available
         if self.hf_client:
@@ -1841,22 +1698,4 @@ class PinnacleChatbot:
 
             return {"error": "Image generation failed. Please try again."}
 
-        # 2. STANDARD MCP TOOLS
-        server_name, actual_tool_name = self.mcp_manager.parse_tool_call(tool_name)
-
-        if not server_name:
-            return f"Refused: Tool '{tool_name}' is not recognized."
-
-        return await self.mcp_manager.call_tool(
-            server_name, actual_tool_name, arguments
-        )
-
-    def print_available_tools(self) -> None:
-        """Print all available MCP tools"""
-        tools = self.mcp_manager.get_all_tools()
-        if not tools:
-            print("\n❌ No MCP tools available")
-            return
-        print(f"\n✅ Available MCP Tools ({len(tools)}):")
-        for tool in tools:
-            print(f"  🔧 {tool['name']} ({tool['server']})")
+        
