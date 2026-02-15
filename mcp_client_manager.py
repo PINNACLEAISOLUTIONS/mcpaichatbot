@@ -60,7 +60,7 @@ class MCPClientManager:
             try:
                 await asyncio.wait_for(
                     self._connect_server(server_name, server_config),
-                    timeout=15.0,
+                    timeout=10.0,
                 )
             except asyncio.TimeoutError:
                 logger.warning(

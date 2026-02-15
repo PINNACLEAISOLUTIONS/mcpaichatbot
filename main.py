@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import time
+import asyncio
 from collections import defaultdict
 
 # Load env immediately before local project imports that might depend on env vars
@@ -124,40 +125,41 @@ async def startup_event():
     project_root = Path(__file__).parent
     config_path = project_root / "mcp_config.json"
 
-    # Initialize MCP Manager
+    # 1. Initialize synchronous components first
+    db_utils.init_db()
+    voice_agent = VoiceAgent()
     mcp_manager = MCPClientManager(config_path=str(config_path))
-    await mcp_manager.load_config()
-    await mcp_manager.connect_to_servers()
-
-    # Initialize HF MCP Client
     hf_client = HuggingFaceMCPClient()
-    await hf_client.start()
 
-    # Initialize Gemini Image Client
     static_gen_dir = project_root / "static" / "generated"
     gemini_image_client = GeminiImageClient(static_dir=str(static_gen_dir))
-    await gemini_image_client.start()
 
-    # Initialize Database
-    db_utils.init_db()
-
-    # Initialize Voice Agent (ElevenLabs TTS with Google fallback)
-    voice_agent = VoiceAgent()
-    logger.info(f"🎙️ Voice Agent: {voice_agent.get_status()}")
-
-    # Initialize Other Clients
     hf_inference = HFInferenceClient()
-    await hf_inference.start()
-
     replicate_client = ReplicateImageClient()
-    await replicate_client.start()
-
     fal_client = FalImageClient()
-    await fal_client.start()
-
     pollinations_client = PollinationsClient()
-    await pollinations_client.start()
 
+    # 2. Parallelize all asynchronous startup tasks
+    logger.info("Initializing services in parallel...")
+    startup_tasks = [
+        mcp_manager.load_config(),
+        mcp_manager.connect_to_servers(),
+        hf_client.start(),
+        gemini_image_client.start(),
+        hf_inference.start(),
+        replicate_client.start(),
+        fal_client.start(),
+        pollinations_client.start(),
+    ]
+
+    # Use return_exceptions=True to ensure one failure doesn't block the whole app
+    results = await asyncio.gather(*startup_tasks, return_exceptions=True)
+
+    for i, res in enumerate(results):
+        if isinstance(res, Exception):
+            logger.error(f"Service initialization task {i} failed: {res}")
+
+    logger.info(f"🎙️ Voice Agent: {voice_agent.get_status()}")
     logger.info("Backend initialized. Pinnacle AI Expert and premium systems ready.")
 
 
@@ -205,6 +207,12 @@ static_generated_path.mkdir(exist_ok=True)
 @app.get("/")
 async def read_index():
     return FileResponse(str(static_path / "index.html"))
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Render deployment."""
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 
 @app.post("/api/chat")
