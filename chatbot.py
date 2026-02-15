@@ -192,8 +192,8 @@ class MCPChatbot:
         self.lead_state["awaiting_permission"] = True
         return (
             "I'd be happy to help you get started with a professional inquiry! \n\n"
-            "**Please allow me to email the Pinnacle AI Solutions Expert Team with your project details**, "
-            "and I'll collect some brief information to ensure we get back to you with the right expertise.\n\n"
+            "**Please allow me to notify the Pinnacle AI Solutions expert team with your project vision**, "
+            "and I'll collect some brief details to ensure we connect you with the right specialist.\n\n"
             "May I proceed with collecting your details? (Just say 'yes' or 'sure' to continue)"
         )
 
@@ -1802,9 +1802,7 @@ class MCPChatbot:
                 logger.info(
                     f"Lead email sent via email_utils for session {self.session_id}"
                 )
-                return (
-                    "Success: Our team has been notified. We will get back to you soon!"
-                )
+                return "Excellent! Our expert team has been notified. We will review your vision and get back to you soon."
             else:
                 return "Note: Lead capture saved to database, but email notification system is currently busy."
         except Exception as e:

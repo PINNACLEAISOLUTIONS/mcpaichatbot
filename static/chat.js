@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentSessionId = null;
         localStorage.removeItem('chatbot_session_id');
         chatMessages.innerHTML = '';
-        addBotMessage("👋 Hello! I'm Pinnacle AI Expert. I can help you design AI agents, build high-performance websites, or create custom scrapers. What project are you working on?");
+        addBotMessage("🚀 **Pinnacle AI Expert Systems**\n\nWelcome! I'm here to help you architect **Elite AI Agents**, **Stealthy Scrapers**, and **Scalable Web Applications**.\n\n*Ready to transform your business with AI? Let's discuss your project!*");
         updateHistory();
     }
 
