@@ -8,17 +8,17 @@ import os
 import logging
 import base64
 from typing import Dict, Any, Optional
-import httpx
+import httpx  # type: ignore
 
 # Import Edge TTS (High-quality free fallback)
 try:
-    import edge_tts
+    import edge_tts  # type: ignore
 except ImportError:
     edge_tts = None
 
 # Import ElevenLabs SDK
 try:
-    from elevenlabs.client import AsyncElevenLabs
+    from elevenlabs.client import AsyncElevenLabs  # type: ignore
 except ImportError:
     AsyncElevenLabs = None
 
@@ -37,7 +37,7 @@ class VoiceAgent:
         "adam": "pNInz6obpgDQGcFmaJgB",  # Deep male
         "antoni": "ErXwobaYiN019PkySvjV",  # Antoni (Deep, well rounded)
     }
-    DEFAULT_VOICE = "antoni"
+    DEFAULT_VOICE = "miami"
 
     # Edge TTS Voice Map
     EDGE_VOICES = {
@@ -129,11 +129,17 @@ class VoiceAgent:
         # 1. Try ElevenLabs
         elevenlabs_error = None
         if self.elevenlabs_api_key:
+            logger.info(f"Attempting ElevenLabs TTS with voice: {voice}")
             result = await self._elevenlabs_tts(clean_text, voice, return_base64)
             if result.get("success"):
+                logger.info(f"✅ Served audio via ElevenLabs ({voice})")
                 return result
             elevenlabs_error = result.get("error", "Unknown ElevenLabs error")
-            logger.warning(f"ElevenLabs failed: {elevenlabs_error}. Trying Edge TTS...")
+            logger.warning(
+                f"❌ ElevenLabs failed: {elevenlabs_error}. Trying Edge TTS..."
+            )
+        else:
+            logger.warning("No ElevenLabs API key - skipping to core providers")
 
         # 2. Try Edge TTS (High Quality Free Fallback)
         edge_error = None

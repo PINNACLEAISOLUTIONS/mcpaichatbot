@@ -1,6 +1,6 @@
 import os
 import logging
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # type: ignore
 import asyncio
 
 # Setup logging
