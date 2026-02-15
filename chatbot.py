@@ -518,7 +518,7 @@ class PinnacleChatbot:
         ]
         logger.info("Chat session reset.")
 
-        def _get_relevant_tools(self, user_message: str) -> List[str]:
+    def _get_relevant_tools(self, user_message: str) -> List[str]:
         """Determine which specific tools are relevant based on keywords."""
         msg = user_message.lower()
         tools = []
@@ -537,7 +537,7 @@ class PinnacleChatbot:
         self, tool_filter: Optional[List[str]] = None
     ) -> Optional[List[Dict[str, Any]]]:
         """Format MCP tools for LiteLLM with EXTREME token saving"""
-        mcp_tools = None.get_all_tools().copy()
+        all_tools = []
 
         # Add Hugging Face MCP tools if client is available
         if self.hf_client:
