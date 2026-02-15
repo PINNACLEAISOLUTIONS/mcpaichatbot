@@ -16,21 +16,24 @@ async def test_elevenlabs_connection():
     load_dotenv(override=True)
 
     api_key = os.getenv("ELEVENLABS_API_KEY")
+
+    print("--- ElevenLabs Connection Test ---")
     if not api_key:
-        logger.error("❌ ELEVENLABS_API_KEY not found in .env file.")
-        print("\nFix: Add ELEVENLABS_API_KEY=your_key_here to your .env file.")
+        print("❌ STATUS: ELEVENLABS_API_KEY is MISSING from environment/ .env")
+        print("Fix: Ensure the key is set in Render's Environment Variables.")
         return
 
+    api_key = api_key.strip()
+    print(f"✅ STATUS: Key found (starts with: {api_key[:5]}...)")
+
     try:
-        from elevenlabs import ElevenLabs
+        from elevenlabs.client import ElevenLabs
 
         client = ElevenLabs(api_key=api_key)
 
-        print("--- ElevenLabs Connection Test ---")
-        print(f"Connecting with API Key: {api_key[:5]}...{api_key[-5:]}")
-
         # 1. Test fetching voices
         print("\n1. Fetching available voices...")
+        # Note: .voices.get_all() is the correct SDK v1.x pattern
         voices_response = client.voices.get_all()
         voices = voices_response.voices
 
@@ -39,16 +42,22 @@ async def test_elevenlabs_connection():
         # 2. Check for specific voice
         target_voice_id = os.getenv("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb")
         voice_found = False
+        voice_name = "Unknown"
         for v in voices:
             if v.voice_id == target_voice_id:
                 print(f"✅ Target Voice Found: '{v.name}' (ID: {v.voice_id})")
                 voice_found = True
+                voice_name = v.name
                 break
 
         if not voice_found:
-            print(
-                f"⚠️ Target Voice ID {target_voice_id} NOT found in your profile. Using default."
-            )
+            print(f"⚠️ Target Voice ID {target_voice_id} NOT found in your profile.")
+            if voices:
+                target_voice_id = voices[0].voice_id
+                voice_name = voices[0].name
+                print(
+                    f"👉 Using first available instead: '{voice_name}' (ID: {target_voice_id})"
+                )
 
         # 3. Test conversion (first 5 words only to save quota)
         print("\n2. Testing small text-to-speech conversion...")
@@ -60,17 +69,19 @@ async def test_elevenlabs_connection():
 
         # Peek at the first chunk
         try:
-            next(audio_generator)
-            print("✅ TTS Stream Handshake: SUCCESS")
+            # For the generator, we use next() to get the first chunk of bytes
+            chunk = next(audio_generator)
+            if chunk:
+                print("✅ TTS Stream Handshake: SUCCESS")
+            else:
+                print("⚠️ Handshake produced empty data.")
         except StopIteration:
             print("⚠️ Handshake produced no data (check quota).")
 
         print("\n--- TEST COMPLETE: EVERYTHING LOOKS GOOD ---")
 
     except ImportError:
-        print(
-            "❌ Error: 'elevenlabs' library not installed. Run 'pip install elevenlabs'"
-        )
+        print("❌ Error: 'elevenlabs' library not installed correctly.")
     except Exception as e:
         print(f"❌ Connection Failed: {str(e)}")
 

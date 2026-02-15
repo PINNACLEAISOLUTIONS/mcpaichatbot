@@ -52,10 +52,8 @@ class VoiceAgent:
     def __init__(self):
         """Initialize voice agent with API keys from environment."""
         # Load API keys from Render environment
-        self.elevenlabs_api_key = (
-            os.getenv("ELEVENLABS_API_KEY")
-            or "sk_067a9530fadd6b203cf48003655fea83e4c0566b806ae77e"
-        )
+        raw_key = os.getenv("ELEVENLABS_API_KEY")
+        self.elevenlabs_api_key = raw_key.strip() if raw_key else None
         self.custom_voice_id = os.getenv("ELEVENLABS_VOICE_ID")
 
         # Reuse existing Google key if specific TTS key isn't provided
