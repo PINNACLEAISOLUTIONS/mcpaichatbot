@@ -6,6 +6,9 @@ from datetime import datetime
 from pathlib import Path
 import tempfile
 from typing import Dict, Any, Optional, List
+import time
+import asyncio
+from collections import defaultdict
 
 from dotenv import load_dotenv  # type: ignore
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File  # type: ignore
@@ -14,12 +17,6 @@ from fastapi.responses import FileResponse, StreamingResponse, JSONResponse  # t
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from fastapi.exceptions import RequestValidationError  # type: ignore
 from pydantic import BaseModel  # type: ignore
-import time
-import asyncio
-from collections import defaultdict
-
-# Load env immediately before local project imports that might depend on env vars
-load_dotenv(override=True)
 
 # Local imports
 import db_utils
@@ -31,7 +28,9 @@ from voice_agent import VoiceAgent
 from hf_inference_client import HFInferenceClient
 from replicate_client import ReplicateImageClient
 from pollinations_client import PollinationsClient
-import email_utils
+
+# Load env
+load_dotenv(override=True)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -369,7 +368,8 @@ async def list_sessions():
     try:
         sessions = db_utils.get_all_sessions()
         return {"sessions": sessions}
-    except:
+    except Exception as e:
+        logger.error(f"Error listing sessions: {e}")
         return {"sessions": []}
 
 
@@ -389,8 +389,8 @@ async def get_tools_endpoint():
                         "description": tool.get("description"),
                     }
                 )
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Error listing HF tools: {e}")
     if gemini_image_client and gemini_image_client.enabled:
         all_tools.extend(gemini_image_client.get_tools())
     return {"tools": all_tools}
