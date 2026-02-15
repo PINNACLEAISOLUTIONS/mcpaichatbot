@@ -537,7 +537,7 @@ class PinnacleChatbot:
         self, tool_filter: Optional[List[str]] = None
     ) -> Optional[List[Dict[str, Any]]]:
         """Format MCP tools for LiteLLM with EXTREME token saving"""
-        all_tools = []
+        mcp_tools = []
 
         # Add Hugging Face MCP tools if client is available
         if self.hf_client:
@@ -708,7 +708,7 @@ class PinnacleChatbot:
                 res_content = await self._start_lead_capture()
                 return {"response": res_content}
             elif any(kw in msg_lower for kw in negative_keywords):
-                res_content = "No problem! Feel free to ask me any questions about our services, or request a quote whenever you're ready. You can also contact us directly at (786) 570-3215 or miamilovesgreenlandscaping@gmail.com."
+                res_content = "No problem! Feel free to ask me any questions about our services, or request a quote whenever you're ready. You can also contact us directly at 352-231-9154 or futureai4all@gmail.com."
                 return {"response": res_content}
             else:
                 res_content = "I didn't quite catch that. Would you like me to proceed with collecting your information for a quote? (Please say 'yes' or 'no')"
