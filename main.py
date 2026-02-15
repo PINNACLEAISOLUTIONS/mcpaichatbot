@@ -1,18 +1,18 @@
 import logging
 import uuid
-import uvicorn
+import uvicorn  # type: ignore
 import os
 from datetime import datetime
 from pathlib import Path
 import tempfile
 from typing import Dict, Any, Optional, List
 
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from dotenv import load_dotenv  # type: ignore
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File  # type: ignore
+from fastapi.staticfiles import StaticFiles  # type: ignore
+from fastapi.responses import FileResponse, StreamingResponse  # type: ignore
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore
+from pydantic import BaseModel  # type: ignore
 import time
 import asyncio
 from collections import defaultdict
@@ -117,7 +117,6 @@ async def startup_event():
         voice_agent, \
         hf_inference, \
         replicate_client, \
-        fal_client, \
         pollinations_client
 
     project_root = Path(__file__).parent
@@ -185,7 +184,6 @@ def get_chatbot(session_id: str) -> MCPChatbot:
     bot.public_base_url = public_base_url
     bot.hf_inference = hf_inference
     bot.replicate_client = replicate_client
-    bot.fal_client = fal_client
     bot.pollinations_client = pollinations_client
 
     active_chatbots[session_id] = bot
@@ -397,7 +395,7 @@ async def text_to_speech(request: TTSRequest):
 @app.post("/api/tts/premium")
 async def elevenlabs_tts_premium(request: Dict[str, str]):
     """Direct ElevenLabs Proxy (v1.3 legacy/direct access)"""
-    from elevenlabs import ElevenLabs
+    from elevenlabs import ElevenLabs  # type: ignore
     import io
 
     text = request.get("text")
@@ -422,7 +420,7 @@ async def transcribe_audio(audio: UploadFile = File(...)):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
             tmp.write(await audio.read())
             tmp_path = tmp.name
-        from groq import Groq
+        from groq import Groq  # type: ignore
 
         client = Groq(api_key=os.getenv("GROQ_API_KEY"))
         with open(tmp_path, "rb") as f:
