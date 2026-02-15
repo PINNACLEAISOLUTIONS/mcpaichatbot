@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import time
@@ -29,7 +29,6 @@ from gemini_image_client import GeminiImageClient
 from voice_agent import VoiceAgent
 from hf_inference_client import HFInferenceClient
 from replicate_client import ReplicateImageClient
-from fal_client import FalImageClient
 from pollinations_client import PollinationsClient
 import email_utils
 
@@ -67,7 +66,6 @@ gemini_image_client = None
 voice_agent = None
 hf_inference = None
 replicate_client = None
-fal_client = None
 pollinations_client = None
 
 # Cache of active chatbot instances in memory
@@ -136,7 +134,6 @@ async def startup_event():
 
     hf_inference = HFInferenceClient()
     replicate_client = ReplicateImageClient()
-    fal_client = FalImageClient()
     pollinations_client = PollinationsClient()
 
     # 2. Parallelize all asynchronous startup tasks
@@ -148,7 +145,6 @@ async def startup_event():
         gemini_image_client.start(),
         hf_inference.start(),
         replicate_client.start(),
-        fal_client.start(),
         pollinations_client.start(),
     ]
 

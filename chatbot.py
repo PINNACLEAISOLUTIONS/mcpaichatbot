@@ -12,9 +12,9 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv  # type: ignore
-from fastapi import HTTPException
+from fastapi import HTTPException  # type: ignore
 import litellm  # type: ignore
-import httpx
+import httpx  # type: ignore
 import asyncio
 
 from mcp_client_manager import MCPClientManager
@@ -59,7 +59,6 @@ class MCPChatbot:
         self.public_base_url = (os.getenv("PUBLIC_BASE_URL") or "").rstrip("/")
         self.hf_inference = None
         self.replicate_client = None
-        self.fal_client = None
         self.pollinations_client = None
 
         self.groq_client = None
