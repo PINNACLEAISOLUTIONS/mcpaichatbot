@@ -73,18 +73,31 @@ def send_lead_email(lead_data: dict) -> bool:
 
         msg.attach(MIMEText(body, "html"))
 
-        # Connect and send
-        server = smtplib.SMTP(smtp_host, int(smtp_port))
+        # Connect and send with enhanced diagnostics
+        logger.info(f"Connecting to SMTP host {smtp_host}:{smtp_port}...")
+        server = smtplib.SMTP(smtp_host, int(smtp_port), timeout=15)
+        
+        logger.info("Starting TLS...")
         server.starttls()
+        
+        logger.info(f"Attempting SMTP login for {smtp_user}...")
         server.login(smtp_user, smtp_pass)
+        
+        logger.info(f"Sending message to {lead_to}...")
         server.send_message(msg)
+        
         server.quit()
-
         logger.info(f"✅ Lead email sent successfully to {lead_to}")
         return True
 
+    except smtplib.SMTPAuthenticationError:
+        logger.error(f"❌ SMTP AUTH FAILED: Check credentials for {smtp_user}")
+        return False
+    except smtplib.SMTPConnectError:
+        logger.error(f"❌ SMTP CONNECTION FAILED: Could not connect to {smtp_host}")
+        return False
     except Exception as e:
-        logger.error(f"❌ Failed to send lead email: {e}")
+        logger.error(f"❌ SMTP Error: {type(e).__name__}: {e}", exc_info=True)
         return False
 
 

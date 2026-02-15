@@ -17,7 +17,6 @@ import litellm  # type: ignore
 import httpx  # type: ignore
 import asyncio
 
-from mcp_client_manager import MCPClientManager
 from groq import Groq  # type: ignore
 import db_utils
 import sqlite3
@@ -44,14 +43,14 @@ urllib_log = logging.getLogger("urllib3")
 urllib_log.setLevel(logging.WARNING)
 
 
-class MCPChatbot:
+class PinnacleChatbot:
     """AI Chatbot powered by LiteLLM (supports Gemini, Ollama, OpenAI, etc.) with MCP integration"""
 
-    def __init__(self, mcp_manager: MCPClientManager, session_id: Optional[str] = None):
+    def __init__(self, session_id: Optional[str] = None):
         """
         Initialize the chatbot with an MCP manager and session ID.
         """
-        self.mcp_manager = mcp_manager
+        self.mcp_manager = None
 
         # Initialize clients
         self.hf_client = None
@@ -83,13 +82,8 @@ class MCPChatbot:
             "active": False,
             "field": None,
             "data": {},
-            "awaiting_permission": False,  # Track if waiting for user permission
-            "fields_to_collect": [
-                "name",
-                "email",
-                "phone",  # Optional - user can skip
-                "description",  # What they want built/done
-            ],
+            "awaiting_permission": False,
+            "fields_to_collect": [],  # Streamlined: handled via tool call directly
         }
 
         # ========== LOCAL BUSINESS CONTEXT (ADDITIVE) ==========
@@ -130,11 +124,13 @@ class MCPChatbot:
             "2. **AI Chatbot Integrations**: We specialize in custom RAG systems and LiteLLM orchestration.\n"
             "3. **AI Agents**: We design autonomous workflows and complex multi-agent systems.\n"
             "4. **Scrapers & Data Extraction**: We create high-scale, stealthy scrapers.\n\n"
+            "### CONTACT INFORMATION:\n"
+            "- **Email**: futureai4all@gmail.com\n"
+            "- **Phone**: 352-231-9154\n\n"
             "### YOUR BEHAVIOR:\n"
             "- **Ask Questions**: When a user mentions a need, ask clarifying questions to provide expert ideas.\n"
-            "- **Be Professional**: Use clear, concise, and technically accurate language.\n"
-            "- **Lead Capture**: When a user wants to CONTACT you, inquires about our services, or wants to start a project, "
-            "you MUST proactively offer to notify our experts and call the 'send_lead_email' tool."
+            "- **Be Direct**: When a user wants to contact us or start a project, simply get their **Name** and **Brief Needs**, then call the 'send_lead_email' tool immediately. Do NOT use a step-by-step questionnaire.\n"
+            "- **Professionalism**: Use clear, concise, and technically accurate language."
         )
 
         # Session management
@@ -205,71 +201,14 @@ class MCPChatbot:
         return "Great! Let's get started. What is your **full name**?"
 
     async def _process_lead_step(self, user_message: str) -> str:
-        """Process one step of the lead capture flow."""
-        current_field = self.lead_state["field"]
-
-        # Allow users to skip optional fields
-        skip_keywords = ["skip", "pass", "n/a", "none", "no", "don't have"]
-        is_skip = any(kw in user_message.lower() for kw in skip_keywords)
-
-        # Phone is optional - user can skip it
-        if current_field == "phone" and is_skip:
-            self.lead_state["data"][current_field] = "Not provided"
-        else:
-            self.lead_state["data"][current_field] = user_message
-
-        # Determine next field
-        fields = self.lead_state["fields_to_collect"]
-        idx = fields.index(current_field)
-
-        if idx + 1 < len(fields):
-            next_field = fields[idx + 1]
-            self.lead_state["field"] = next_field
-            prompts = {
-                "email": "Great! What's your **email address**?",
-                "phone": "What's the best **phone number** to reach you at? (You can skip this if you prefer email only - just type 'skip')",
-                "description": "Perfect! Please provide a **brief description** of what you want built or done:",
-            }
-            return prompts.get(next_field, f"Please provide your {next_field}:")
-        else:
-            # All fields collected
-            data = self.lead_state["data"]
-            self.lead_state["active"] = False
-            self.lead_state["field"] = None
-
-            # Save lead to database
-            db_utils.save_lead(data)
-
-            # Automated email notification
-            email_sent = email_utils.send_lead_email(data)
-
-            summary = "### Quote Request Summary\n\n"
-            summary += f"- **Name:** {data.get('name')}\n"
-            summary += f"- **Email:** {data.get('email')}\n"
-            summary += f"- **Phone:** {data.get('phone', 'Not provided')}\n"
-            summary += f"- **Project:** {data.get('description')}\n\n"
-
-            if email_sent:
-                summary += "✅ **Request Sent Automatically!** I have emailed your details directly to our team at Miami Loves Green Landscaping.\n\n"
-            else:
-                summary += "⚠️ **Processing Note:** I've saved your details to our database, but our automated email system is currently warming up.\n\n"
-                summary += "No worries! Our team reviews these daily, or you can click below to send a quick backup email:\n"
-                summary += f"[Send Backup Email Now]({email_utils.generate_mailto_link(data)})\n\n"
-
-            summary += "Our experts will review your details and contact you within 24 hours to discuss your project.\n\n"
-            summary += "For urgent requests, call us at **(786) 570-3215**."
-
-            logger.info(
-                f"Lead captured for {data.get('name')}. Email sent: {email_sent}"
-            )
-
-            return summary
+        """Process lead step (DEPRECATED - now handled via direct tool call)."""
+        return "Please tell me your name and what you're looking for, and I'll notify our team immediately."
 
     async def _lookup_business_knowledge(self, message: str) -> Optional[str]:
         """Classify message and return relevant business knowledge if applicable.
 
         SMART FILTER: Skips KB injection for generic questions to improve response speed.
-        All existing Miami Loves Green detection logic is preserved below.
+        All existing Pinnacle AI Solutions detection logic is preserved below.
         """
         msg_lower = message.lower()
 
@@ -336,7 +275,7 @@ class MCPChatbot:
 
         if any(kw in msg_lower for kw in all_keywords) and self.knowledge_base:
             # Return business knowledge to help answer service inquiries
-            logger.info("Injecting business knowledge for Miami Loves Green query")
+            logger.info("Injecting business knowledge for Pinnacle AI query")
             return self.knowledge_base
         return None
 
@@ -496,7 +435,7 @@ class MCPChatbot:
                 return f"The user is in {state}. Adjust your recommendations for that market."
 
         # Default to home region
-        return f"When discussing local business strategies, you may reference {self.default_region} as the home region for Miami Loves Green Landscaping."
+        return f"When discussing local business strategies, you may reference {self.default_region} as the home region for Pinnacle AI Solutions."
 
     def load_history(self, session_id: str) -> List[Dict]:
         """Load conversation history and optional title from SQLite database."""
@@ -1809,14 +1748,22 @@ class MCPChatbot:
                 logger.info(
                     f"Lead email sent via email_utils for session {self.session_id}"
                 )
-                return "Excellent! Our expert team has been notified. We will review your vision and get back to you soon."
+                res = "### ✅ Request Sent Successfully!\n\n"
+                res += "Our expert team has been notified. We will review your vision and get back to you within 24 hours.\n\n"
+                res += "**For urgent inquiries, call us directly at 352-231-9154.**"
+                return res
             else:
-                return "Note: Lead capture saved to database, but email notification system is currently busy."
+                res = "### ⚠️ System Note\n\n"
+                res += "I've saved your details to our database, but the automated email system is currently busy.\n\n"
+                res += "Our team reviews these daily, or you can use this direct link to send a quick backup email:\n"
+                res += f"[Send Direct Email Now]({email_utils.generate_mailto_link(lead_data)})\n\n"
+                res += "**Or call us at 352-231-9154.**"
+                return res
         except Exception as e:
             logger.error(f"Failed to send lead email wrapper: {e}")
             return f"Error sending notification: {str(e)}"
 
-    async def _execute_mcp_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
+    async def _execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         """Execute an MCP tool with safety gate and robust image fallback"""
         logger.info(f"DEBUG: _execute_mcp_tool -> tool='{tool_name}' args={arguments}")
 

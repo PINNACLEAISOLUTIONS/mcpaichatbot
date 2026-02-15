@@ -20,9 +20,7 @@ from pydantic import BaseModel  # type: ignore
 
 # Local imports
 import db_utils
-from mcp_client_manager import MCPClientManager
-from chatbot import MCPChatbot
-from hf_mcp_client import HuggingFaceMCPClient
+from chatbot import PinnacleChatbot
 from gemini_image_client import GeminiImageClient
 from voice_agent import VoiceAgent
 from hf_inference_client import HFInferenceClient
@@ -84,7 +82,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # Global state
-mcp_manager = None
+
 hf_client = None
 gemini_image_client = None
 voice_agent = None
@@ -93,7 +91,7 @@ replicate_client = None
 pollinations_client = None
 
 # Cache of active chatbot instances in memory
-active_chatbots: Dict[str, MCPChatbot] = {}
+active_chatbots: Dict[str, PinnacleChatbot] = {}
 
 # Rate Limiting & Caching State
 ip_request_counts: Dict[str, List[float]] = defaultdict(list)
@@ -401,7 +399,7 @@ async def status_endpoint():
     return {
         "status": "online",
         "version": APP_VERSION,
-        "mcp_servers": list(mcp_manager.clients.keys()) if mcp_manager else [],
+        
         "voice_agent": voice_agent.get_status() if voice_agent else None,
         "database": db_utils.check_db_connection(),
     }

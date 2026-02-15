@@ -55,9 +55,23 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         recognition.onend = () => {
-            isRecording = false;
-            micBtn.classList.remove('recording');
-            if (voiceVisualizer) voiceVisualizer.classList.add('hidden');
+            if (isRecording && !useHDMode) {
+                // Unexpected end while we still want to record (common on Desktop/Chrome)
+                console.log("Recognition ended unexpectedly. Restarting...");
+                try { recognition.start(); } catch(e) { console.error("Auto-restart failed:", e); isRecording = false; }
+            } else {
+                isRecording = false;
+                micBtn.classList.remove('recording');
+                if (voiceVisualizer) voiceVisualizer.classList.add('hidden');
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Speech recognition error:", event.error);
+            // Don't kill the session on 'no-speech' or 'audio-capture' errors
+            if (event.error === 'no-speech') {
+                 console.log("No speech detected. Keeping mic open...");
+            }
         };
 
         recognition.onresult = (event) => {
