@@ -7,7 +7,6 @@ from pathlib import Path
 import tempfile
 from typing import Dict, Any, Optional, List
 import time
-import asyncio
 from collections import defaultdict
 
 from dotenv import load_dotenv  # type: ignore

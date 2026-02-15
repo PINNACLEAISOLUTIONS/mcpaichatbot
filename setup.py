@@ -1,6 +1,5 @@
 """Setup script to help configure the MCP chatbot"""
 
-import os
 import sys
 from pathlib import Path
 
