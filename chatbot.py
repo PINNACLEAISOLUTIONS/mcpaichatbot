@@ -129,7 +129,7 @@ class PinnacleChatbot:
             "- **Phone**: 352-231-9154\n\n"
             "### YOUR BEHAVIOR:\n"
             "- **Ask Questions**: When a user mentions a need, ask clarifying questions to provide expert ideas.\n"
-            "- **Be Direct**: When a user wants to contact us or start a project, simply get their **Name** and **Brief Needs**, then call the 'send_lead_email' tool immediately. Do NOT use a step-by-step questionnaire.\n"
+            "- **Be Direct**: When a user wants to contact us or start a project, get their **Name**, **Email**, and **Brief Needs**, then call the 'send_lead_email' tool immediately. Do NOT use a step-by-step questionnaire.\n"
             "- **Professionalism**: Use clear, concise, and technically accurate language."
         )
 
@@ -580,10 +580,10 @@ class PinnacleChatbot:
                             },
                             "user_info": {
                                 "type": "string",
-                                "description": "Optional contact info if provided by user (email, name, etc.)",
+                                "description": "Mandatory contact info (Name and Email)",
                             },
                         },
-                        "required": ["interest_detail"],
+                        "required": ["interest_detail", "user_info"],
                     },
                 },
             }

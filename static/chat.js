@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
-        recognition.continuous = true;
+        recognition.continuous = true;\n        recognition.interimResults = true;\n        recognition.maxAlternatives = 1;
         recognition.lang = 'en-US';
         recognition.interimResults = true;
 
@@ -56,11 +56,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         recognition.onend = () => {
             if (isRecording && !useHDMode) {
-                // Unexpected end while we still want to record (common on Desktop/Chrome)
-                console.log("Recognition ended unexpectedly. Restarting...");
-                try { recognition.start(); } catch(e) { console.error("Auto-restart failed:", e); isRecording = false; }
-            } else {
-                isRecording = false;
+                console.log("Recognition ended (normal or timeout). Restarting to keep session alive...");
+                // Aggressive restart for Desktop
+                setTimeout(() => {
+                    try { 
+                        if (isRecording) recognition.start(); 
+                    } catch(e) { 
+                        console.error("Auto-restart failed:", e); 
+                        // If it fails, force the UI to reflect state
+                        if (!isSpeaking) {
+                           isRecording = false;
+                           micBtn.classList.remove('recording');
+                        }
+                    }
+                }, 300);
+            } else if (!isRecording) {
                 micBtn.classList.remove('recording');
                 if (voiceVisualizer) voiceVisualizer.classList.add('hidden');
             }

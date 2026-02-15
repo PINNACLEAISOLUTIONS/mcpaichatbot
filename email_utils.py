@@ -43,7 +43,7 @@ def send_lead_email(lead_data: dict) -> bool:
     smtp_host = os.getenv("SMTP_HOST") or "smtp.gmail.com"
     smtp_port = os.getenv("SMTP_PORT") or "587"
     smtp_user = os.getenv("SMTP_USER") or "futureai4all@gmail.com"
-    smtp_pass = os.getenv("SMTP_PASS") or "zcmhxmzfypdcvhrp"
+    smtp_pass = os.getenv("SMTP_PASS")
     lead_to = os.getenv("LEAD_TO_EMAIL") or "futureai4all@gmail.com"
 
     if not all([smtp_host, smtp_user, smtp_pass, lead_to]):
