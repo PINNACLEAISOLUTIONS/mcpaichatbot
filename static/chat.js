@@ -321,12 +321,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         const msgId = addBotMessage(botText, data);
                         if (autoSpeak && msgId) { if (voiceModeActive) speakWithElevenLabs(botText, msgId); else speakTextBrowser(botText, msgId); }
                         if (data.session_id) { currentSessionId = data.session_id; localStorage.setItem('chatbot_session_id', data.session_id); updateHistory();
-    // Initial state check for mobile welcome message
-    if (chatMessages && chatMessages.children.length === 0) {
-        console.log("Chat empty, showing welcome message");
-        addBotMessage("🚀 **Pinnacle AI Expert Systems**\n\nWelcome! I'm here to help you architect **Elite AI Agents**, **Stealthy Scrapers**, and **Scalable Web Applications**.\n\n*Ready to transform your business with AI? Let's discuss your project!*");
-    } }
-                    }
                 } catch (parseErr) {
                     console.error("Failed to parse chat response JSON:", parseErr);
                     console.error("Raw response content:", rawText);
@@ -457,16 +451,18 @@ document.addEventListener('DOMContentLoaded', () => {
         scrollToBottom();
     }
 
+
+    function checkWelcomeMessage() {
+        if (chatMessages && chatMessages.children.length === 0) {
+            addBotMessage("🚀 **Pinnacle AI Expert Systems**\n\nWelcome! I'm here to help you architect **Elite AI Agents**, **Stealthy Scrapers**, and **Scalable Web Applications**.\n\n*Ready to transform your business with AI? Let's discuss your project!*");
+        }
+    }
     function startNewChat() {
         currentSessionId = null;
         localStorage.removeItem('chatbot_session_id');
         chatMessages.innerHTML = '';
-        addBotMessage("🚀 **Pinnacle AI Expert Systems**\n\nWelcome! I'm here to help you architect **Elite AI Agents**, **Stealthy Scrapers**, and **Scalable Web Applications**.\n\n*Ready to transform your business with AI? Let's discuss your project!*");
+        checkWelcomeMessage();
         updateHistory();
-    // Initial state check for mobile welcome message
-    if (chatMessages && chatMessages.children.length === 0) {
-        console.log("Chat empty, showing welcome message");
-        addBotMessage("🚀 **Pinnacle AI Expert Systems**\n\nWelcome! I'm here to help you architect **Elite AI Agents**, **Stealthy Scrapers**, and **Scalable Web Applications**.\n\n*Ready to transform your business with AI? Let's discuss your project!*");
     }
     }
 
@@ -497,11 +493,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 else addBotMessage(m.content, m.data);
             });
             updateHistory();
-    // Initial state check for mobile welcome message
-    if (chatMessages && chatMessages.children.length === 0) {
-        console.log("Chat empty, showing welcome message");
-        addBotMessage("🚀 **Pinnacle AI Expert Systems**\n\nWelcome! I'm here to help you architect **Elite AI Agents**, **Stealthy Scrapers**, and **Scalable Web Applications**.\n\n*Ready to transform your business with AI? Let's discuss your project!*");
-    }
         } catch (err) { addErrorMessage("Failed to load session."); }
     };
 
@@ -509,9 +500,4 @@ document.addEventListener('DOMContentLoaded', () => {
     function escapeHTML(str) { return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
 
     updateHistory();
-    // Initial state check for mobile welcome message
-    if (chatMessages && chatMessages.children.length === 0) {
-        console.log("Chat empty, showing welcome message");
-        addBotMessage("🚀 **Pinnacle AI Expert Systems**\n\nWelcome! I'm here to help you architect **Elite AI Agents**, **Stealthy Scrapers**, and **Scalable Web Applications**.\n\n*Ready to transform your business with AI? Let's discuss your project!*");
-    }
 });
