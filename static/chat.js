@@ -43,7 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
-        recognition.continuous = true;\n        recognition.interimResults = true;\n        recognition.maxAlternatives = 1;
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
         recognition.lang = 'en-US';
         recognition.interimResults = true;
 
@@ -111,7 +113,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let audioChunks = [];
 
     async function startListening() {
+        if (isRecording) {
+            console.log("Already recording, skipping startListening");
+            return;
+        }
         stopSpeaking();
+        console.log("Starting listening session...");
         if (useHDMode) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -140,7 +147,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 mediaRecorder.start();
             } catch (err) { alert('Microphone access failed.'); }
         } else if (recognition) {
-            recognition.start();
+            try { 
+            console.log("Calling recognition.start()...");
+            recognition.start(); 
+        } catch(e) { 
+            if (e.name === 'InvalidStateError') {
+                console.warn("Recognition already started or in starting state.");
+            } else {
+                console.error("Speech recognition start failed:", e);
+                isRecording = false;
+                micBtn.classList.remove('recording');
+            }
+        }
         }
     }
 
@@ -240,16 +258,16 @@ document.addEventListener('DOMContentLoaded', () => {
         autoSpeak = voiceModeActive;
         if (autoSpeakToggle) autoSpeakToggle.checked = autoSpeak;
 
-        console.log(`Voice Mode: ${voiceModeActive ? 'Enabling' : 'Disabling'}`);
+        console.log(`Voice Mode Action: ${voiceModeActive ? 'Enabling' : 'Disabling'}`);
 
         try {
             if (voiceModeActive) {
-                // Ensure we stop any existing audio first
                 stopSpeaking();
-                // Activation handshake
-                await speakWithElevenLabs("Pinnacle AI Voice Mode active. How can I assist?", null);
+                stopListening(); // Ensure clean state before handshake
+                await speakWithElevenLabs("Voice mode enabled. I am listening.", null);
             } else {
                 stopSpeaking();
+                isRecording = false; // Force state reset
                 stopListening();
             }
         } catch (err) {
