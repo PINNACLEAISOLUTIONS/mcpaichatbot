@@ -464,7 +464,6 @@ document.addEventListener('DOMContentLoaded', () => {
         checkWelcomeMessage();
         updateHistory();
     }
-    }
 
     async function updateHistory() {
         if (!historyList) return;
