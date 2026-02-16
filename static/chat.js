@@ -247,14 +247,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let voiceBtnCooldown = false;
     if (voiceModeBtn) voiceModeBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        if (voiceBtnCooldown) return;
-
-        voiceBtnCooldown = true;
+        // REMOVED cooldown for better responsiveness
         voiceModeActive = !voiceModeActive;
 
-        // Premium Visual Feedback
-        voiceModeBtn.classList.add('working');
+        // Instant UI toggle
         voiceModeBtn.classList.toggle('active', voiceModeActive);
+        if (voiceModeActive) {
+            voiceModeBtn.classList.add('working');
+        } else {
+            voiceModeBtn.classList.remove('working');
+        }
         autoSpeak = voiceModeActive;
         if (autoSpeakToggle) autoSpeakToggle.checked = autoSpeak;
 
@@ -263,8 +265,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             if (voiceModeActive) {
                 stopSpeaking();
-                stopListening(); // Ensure clean state before handshake
-                await speakWithElevenLabs("Voice mode enabled. I am listening.", null);
+                stopListening();
+                // Handshake and Mic start concurrently
+                speakWithElevenLabs("Voice mode enabled. I am listening.", null);
+                setTimeout(() => { if (voiceModeActive) startListening(); }, 500); 
             } else {
                 stopSpeaking();
                 isRecording = false; // Force state reset
@@ -316,7 +320,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         const botText = typeof data.response === 'string' ? data.response : data.response.response;
                         const msgId = addBotMessage(botText, data);
                         if (autoSpeak && msgId) { if (voiceModeActive) speakWithElevenLabs(botText, msgId); else speakTextBrowser(botText, msgId); }
-                        if (data.session_id) { currentSessionId = data.session_id; localStorage.setItem('chatbot_session_id', data.session_id); updateHistory(); }
+                        if (data.session_id) { currentSessionId = data.session_id; localStorage.setItem('chatbot_session_id', data.session_id); updateHistory();
+    // Initial state check for mobile welcome message
+    if (chatMessages && chatMessages.children.length === 0) {
+        console.log("Chat empty, showing welcome message");
+        addBotMessage("🚀 **Pinnacle AI Expert Systems**\n\nWelcome! I'm here to help you architect **Elite AI Agents**, **Stealthy Scrapers**, and **Scalable Web Applications**.\n\n*Ready to transform your business with AI? Let's discuss your project!*");
+    } }
                     }
                 } catch (parseErr) {
                     console.error("Failed to parse chat response JSON:", parseErr);
@@ -454,6 +463,11 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessages.innerHTML = '';
         addBotMessage("🚀 **Pinnacle AI Expert Systems**\n\nWelcome! I'm here to help you architect **Elite AI Agents**, **Stealthy Scrapers**, and **Scalable Web Applications**.\n\n*Ready to transform your business with AI? Let's discuss your project!*");
         updateHistory();
+    // Initial state check for mobile welcome message
+    if (chatMessages && chatMessages.children.length === 0) {
+        console.log("Chat empty, showing welcome message");
+        addBotMessage("🚀 **Pinnacle AI Expert Systems**\n\nWelcome! I'm here to help you architect **Elite AI Agents**, **Stealthy Scrapers**, and **Scalable Web Applications**.\n\n*Ready to transform your business with AI? Let's discuss your project!*");
+    }
     }
 
     async function updateHistory() {
@@ -483,6 +497,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 else addBotMessage(m.content, m.data);
             });
             updateHistory();
+    // Initial state check for mobile welcome message
+    if (chatMessages && chatMessages.children.length === 0) {
+        console.log("Chat empty, showing welcome message");
+        addBotMessage("🚀 **Pinnacle AI Expert Systems**\n\nWelcome! I'm here to help you architect **Elite AI Agents**, **Stealthy Scrapers**, and **Scalable Web Applications**.\n\n*Ready to transform your business with AI? Let's discuss your project!*");
+    }
         } catch (err) { addErrorMessage("Failed to load session."); }
     };
 
@@ -490,4 +509,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function escapeHTML(str) { return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
 
     updateHistory();
+    // Initial state check for mobile welcome message
+    if (chatMessages && chatMessages.children.length === 0) {
+        console.log("Chat empty, showing welcome message");
+        addBotMessage("🚀 **Pinnacle AI Expert Systems**\n\nWelcome! I'm here to help you architect **Elite AI Agents**, **Stealthy Scrapers**, and **Scalable Web Applications**.\n\n*Ready to transform your business with AI? Let's discuss your project!*");
+    }
 });
