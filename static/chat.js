@@ -59,7 +59,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = null;
 
-    if (SpeechRecognition) {
+    if (!SpeechRecognition) {
+        console.log("SpeechRecognition not supported, forcing HD Mode (MediaRecorder)");
+        useHDMode = true; // Force HD mode for iOS Chrome/Firefox, etc.
+        if (hdToggleBtn) {
+            hdToggleBtn.textContent = 'HD';
+            hdToggleBtn.classList.add('hd-active');
+            hdToggleBtn.disabled = true; // Lock in HD mode
+        }
+    } else {
         recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
@@ -98,8 +106,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         recognition.onerror = (event) => {
             console.error("Speech recognition error:", event.error);
-            // Don't kill the session on 'no-speech' or 'audio-capture' errors
-            if (event.error === 'no-speech') {
+            if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                isRecording = false;
+                micBtn.classList.remove('recording');
+                if (voiceVisualizer) voiceVisualizer.classList.add('hidden');
+                voiceModeActive = false;
+                if (voiceModeBtn) {
+                    voiceModeBtn.classList.remove('active');
+                    voiceModeBtn.classList.remove('working');
+                }
+            } else if (event.error === 'no-speech') {
                 console.log("No speech detected. Keeping mic open...");
             }
         };
@@ -158,12 +174,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     } catch (err) { console.error('Transcription error:', err); }
                     micBtn.classList.remove('processing');
                     stream.getTracks().forEach(track => track.stop());
+                    setTimeout(() => {
+                        // Re-open mic after HD processing if voice mode is still active
+                        if (voiceModeActive && !isSpeaking && !isRecording) {
+                            startListening();
+                        }
+                    }, 500);
                 };
                 isRecording = true;
                 micBtn.classList.add('recording');
                 if (voiceVisualizer) voiceVisualizer.classList.remove('hidden');
                 mediaRecorder.start();
-            } catch (err) { alert('Microphone access failed.'); }
+            } catch (err) {
+                console.error('Microphone access failed:', err);
+                isRecording = false; // Reset on failure
+                if (voiceModeActive) { // Fallback to prompt user
+                    voiceModeActive = false;
+                    if (voiceModeBtn) voiceModeBtn.classList.remove('active');
+                    addErrorMessage("Could not access microphone. Please check permissions.");
+                }
+            }
         } else if (recognition) {
             try {
                 console.log("Calling recognition.start()...");
@@ -181,13 +211,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function stopListening() {
+        console.log("stopListening called. Current isRecording:", isRecording);
+        isRecording = false; // IMMEDIATELY set to false so onend doesn't restart
         if (useHDMode && mediaRecorder && mediaRecorder.state === 'recording') {
             mediaRecorder.stop();
-            isRecording = false;
             micBtn.classList.remove('recording');
             if (voiceVisualizer) voiceVisualizer.classList.add('hidden');
         } else if (recognition) {
             recognition.stop();
+            micBtn.classList.remove('recording');
+            if (voiceVisualizer) voiceVisualizer.classList.add('hidden');
         }
     }
 
@@ -226,6 +259,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.onstart = () => { isSpeaking = true; currentSpeakingMsgId = msgId; updateSpeakButton(msgId, true); };
         utterance.onend = () => {
+            isSpeaking = false; updateSpeakButton(msgId, false);
+            if (voiceModeActive && !isRecording) startListening();
+        };
+        utterance.onerror = (e) => {
+            console.error("SpeechSynthesis error:", e);
             isSpeaking = false; updateSpeakButton(msgId, false);
             if (voiceModeActive && !isRecording) startListening();
         };
@@ -283,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             if (voiceModeActive) {
                 stopSpeaking();
-                stopListening();
+                stopListening(); // isRecording becomes false
 
                 // Trigger the greeting. The onended callbacks in TTS handle calling startListening.
                 // We add a safety timeout to force mic start if TTS totally failed or was blocked by iOS.
