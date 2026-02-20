@@ -5,6 +5,8 @@ import urllib.parse
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
+import resend
+
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,30 @@ def send_lead_email(lead_data: dict) -> bool:
 
         msg.attach(MIMEText(body, "html"))
 
+        # Try Resend first if API key is present
+        resend_api_key = os.getenv("RESEND_API_KEY")
+        if resend_api_key:
+            try:
+                logger.info("Attempting to send email via Resend API...")
+                resend.api_key = resend_api_key
+
+                resend.Emails.send(
+                    {
+                        "from": os.getenv("RESEND_FROM", "onboarding@resend.dev"),
+                        "to": lead_to,
+                        "subject": f"🚀 New Project: {lead_data.get('name')} - Pinnacle AI",
+                        "html": body,
+                    }
+                )
+
+                logger.info(f"✅ Lead email sent successfully via Resend to {lead_to}")
+                return True
+            except Exception as resend_err:
+                logger.warning(
+                    f"⚠️ Resend failed ({resend_err}). Falling back to SMTP..."
+                )
+
+        # SMTP Fallback
         # Connect and send with enhanced diagnostics
         logger.info(f"Connecting to SMTP host {smtp_host}:{smtp_port}...")
         server = smtplib.SMTP(smtp_host, int(smtp_port), timeout=15)
@@ -91,7 +117,7 @@ def send_lead_email(lead_data: dict) -> bool:
         server.send_message(msg)
 
         server.quit()
-        logger.info(f"✅ Lead email sent successfully to {lead_to}")
+        logger.info(f"✅ Lead email sent successfully via SMTP to {lead_to}")
         return True
 
     except smtplib.SMTPAuthenticationError:
