@@ -23,7 +23,25 @@ document.addEventListener('DOMContentLoaded', () => {
     let isSpeaking = false;
     let currentSpeakingMsgId = null;
     let voiceModeActive = false;
-    let currentAudio = null;
+    const systemAudio = new Audio();
+
+    // Unlock Audio for Mobile Safari on first interaction
+    function unlockAudio() {
+        if (!systemAudio.src) {
+            systemAudio.src = 'data:audio/mp3;base64,//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
+            systemAudio.play().catch(() => { });
+        }
+        if ('speechSynthesis' in window) {
+            const u = new SpeechSynthesisUtterance('');
+            u.volume = 0;
+            window.speechSynthesis.speak(u);
+        }
+        document.body.removeEventListener('click', unlockAudio);
+        document.body.removeEventListener('touchstart', unlockAudio);
+    }
+    document.body.addEventListener('click', unlockAudio);
+    document.body.addEventListener('touchstart', unlockAudio);
+
     let elevenLabsAvailable = true; // Assume true, fallback handles failures
     let isRecording = false;
 
@@ -187,16 +205,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success && data.audio_base64) {
                 stopSpeaking();
                 const audioBlob = base64ToBlob(data.audio_base64, data.content_type || 'audio/mpeg');
-                currentAudio = new Audio(URL.createObjectURL(audioBlob));
+                systemAudio.src = URL.createObjectURL(audioBlob);
                 isSpeaking = true;
                 currentSpeakingMsgId = msgId;
                 updateSpeakButton(msgId, true);
-                currentAudio.onended = () => {
+                systemAudio.onended = () => {
                     isSpeaking = false;
                     updateSpeakButton(msgId, false);
                     if (voiceModeActive && !isRecording) startListening();
                 };
-                await currentAudio.play();
+                await systemAudio.play();
             } else { speakTextBrowser(text, msgId); }
         } catch (err) { speakTextBrowser(text, msgId); }
     }
@@ -215,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function stopSpeaking() {
-        if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+        if (systemAudio && !systemAudio.paused) { systemAudio.pause(); systemAudio.currentTime = 0; }
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         isSpeaking = false;
         if (currentSpeakingMsgId) updateSpeakButton(currentSpeakingMsgId, false);
@@ -266,9 +284,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (voiceModeActive) {
                 stopSpeaking();
                 stopListening();
-                // Handshake and Mic start concurrently
+
+                // Trigger the greeting. The onended callbacks in TTS handle calling startListening.
+                // We add a safety timeout to force mic start if TTS totally failed or was blocked by iOS.
+                setTimeout(() => {
+                    if (voiceModeActive && !isSpeaking && !isRecording) startListening();
+                }, 3000);
+
                 speakWithElevenLabs("Voice mode enabled. I am listening.", null);
-                setTimeout(() => { if (voiceModeActive) startListening(); }, 500);
             } else {
                 stopSpeaking();
                 isRecording = false; // Force state reset

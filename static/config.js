@@ -2,9 +2,10 @@ const BACKEND_URL = "https://miamilovesgreenlandscaping.onrender.com"; // Update
 
 // Helper to determine API Base URL
 function getApiBaseUrl() {
-    // If running locally (localhost or 127.0.0.1), use local backend
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return 'http://localhost:8001';
+    const hn = window.location.hostname;
+    // If running locally or on local network (localhost, 127.0.0.1, 192.168.x.x, 10.x.x.x), use local backend
+    if (hn === 'localhost' || hn === '127.0.0.1' || hn.startsWith('192.168.') || hn.startsWith('10.') || hn.startsWith('172.')) {
+        return `http://${hn}:8001`; // Use local backend dynamically
     }
     // Otherwise use the production Render URL
     return BACKEND_URL;
