@@ -84,17 +84,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         recognition.onend = () => {
             if (isRecording && !useHDMode) {
-                console.log("Recognition ended (normal or timeout). Restarting to keep session alive...");
-                // Aggressive restart for Desktop
+                // If browser cuts off natively (silence detection) and we have text in voice mode, send it
+                if (userInput.value.trim() && voiceModeActive) {
+                    console.log("Natural browser silence ended recognition, sending message.");
+                    isRecording = false;
+                    micBtn.classList.remove('recording');
+                    if (voiceVisualizer) voiceVisualizer.classList.add('hidden');
+                    sendMessage();
+                    return;
+                }
+
+                console.log("Recognition ended (no text). Restarting to keep session alive...");
                 setTimeout(() => {
                     try {
                         if (isRecording) recognition.start();
                     } catch (e) {
                         console.error("Auto-restart failed:", e);
-                        // If it fails, force the UI to reflect state
                         if (!isSpeaking) {
                             isRecording = false;
                             micBtn.classList.remove('recording');
+                            if (voiceVisualizer) voiceVisualizer.classList.add('hidden');
                         }
                     }
                 }, 300);
@@ -120,25 +129,32 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        let silenceTimer = null;
         recognition.onresult = (event) => {
-            // BARGE-IN: Stop speaking immediately if any speech is detected (even interim)
+            // BARGE-IN: Stop speaking immediately if any speech is detected
             if (isSpeaking) {
                 console.log("Barge-in detected (speech started)");
                 stopSpeaking();
             }
 
-            let finalTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
-                }
+            let fullTranscript = '';
+            for (let i = 0; i < event.results.length; ++i) {
+                fullTranscript += event.results[i][0].transcript;
             }
-            if (finalTranscript) {
-                userInput.value = finalTranscript;
+            if (fullTranscript) {
+                userInput.value = fullTranscript;
                 userInput.dispatchEvent(new Event('input'));
-                stopListening();
-                setTimeout(() => { if (userInput.value.trim()) sendMessage(); }, 400);
             }
+
+            // Auto-send after 2 seconds of silence instead of instant cutoff
+            clearTimeout(silenceTimer);
+            silenceTimer = setTimeout(() => {
+                if (userInput.value.trim() && isRecording && voiceModeActive) {
+                    console.log("2 seconds of silence reached, sending message.");
+                    stopListening();
+                    setTimeout(() => { if (userInput.value.trim()) sendMessage(); }, 300);
+                }
+            }, 2000);
         };
     }
 
