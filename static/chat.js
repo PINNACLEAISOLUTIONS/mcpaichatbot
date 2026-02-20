@@ -61,14 +61,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("Recognition ended (normal or timeout). Restarting to keep session alive...");
                 // Aggressive restart for Desktop
                 setTimeout(() => {
-                    try { 
-                        if (isRecording) recognition.start(); 
-                    } catch(e) { 
-                        console.error("Auto-restart failed:", e); 
+                    try {
+                        if (isRecording) recognition.start();
+                    } catch (e) {
+                        console.error("Auto-restart failed:", e);
                         // If it fails, force the UI to reflect state
                         if (!isSpeaking) {
-                           isRecording = false;
-                           micBtn.classList.remove('recording');
+                            isRecording = false;
+                            micBtn.classList.remove('recording');
                         }
                     }
                 }, 300);
@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Speech recognition error:", event.error);
             // Don't kill the session on 'no-speech' or 'audio-capture' errors
             if (event.error === 'no-speech') {
-                 console.log("No speech detected. Keeping mic open...");
+                console.log("No speech detected. Keeping mic open...");
             }
         };
 
@@ -147,18 +147,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 mediaRecorder.start();
             } catch (err) { alert('Microphone access failed.'); }
         } else if (recognition) {
-            try { 
-            console.log("Calling recognition.start()...");
-            recognition.start(); 
-        } catch(e) { 
-            if (e.name === 'InvalidStateError') {
-                console.warn("Recognition already started or in starting state.");
-            } else {
-                console.error("Speech recognition start failed:", e);
-                isRecording = false;
-                micBtn.classList.remove('recording');
+            try {
+                console.log("Calling recognition.start()...");
+                recognition.start();
+            } catch (e) {
+                if (e.name === 'InvalidStateError') {
+                    console.warn("Recognition already started or in starting state.");
+                } else {
+                    console.error("Speech recognition start failed:", e);
+                    isRecording = false;
+                    micBtn.classList.remove('recording');
+                }
             }
-        }
         }
     }
 
@@ -268,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 stopListening();
                 // Handshake and Mic start concurrently
                 speakWithElevenLabs("Voice mode enabled. I am listening.", null);
-                setTimeout(() => { if (voiceModeActive) startListening(); }, 500); 
+                setTimeout(() => { if (voiceModeActive) startListening(); }, 500);
             } else {
                 stopSpeaking();
                 isRecording = false; // Force state reset
@@ -320,7 +320,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         const botText = typeof data.response === 'string' ? data.response : data.response.response;
                         const msgId = addBotMessage(botText, data);
                         if (autoSpeak && msgId) { if (voiceModeActive) speakWithElevenLabs(botText, msgId); else speakTextBrowser(botText, msgId); }
-                        if (data.session_id) { currentSessionId = data.session_id; localStorage.setItem('chatbot_session_id', data.session_id); updateHistory();
+                        if (data.session_id) {
+                            currentSessionId = data.session_id;
+                            localStorage.setItem('chatbot_session_id', data.session_id);
+                            updateHistory();
+                        }
+                    }
                 } catch (parseErr) {
                     console.error("Failed to parse chat response JSON:", parseErr);
                     console.error("Raw response content:", rawText);
@@ -366,7 +371,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!line.startsWith('data: ')) continue;
                     try {
                         const payload = JSON.parse(line.slice(6));
-                        // ... payload processing ...
+                        if (payload.type === 'token') {
+                            accumulated += payload.content;
+                            contentDiv.innerHTML = marked.parse(accumulated + '<span class="streaming-cursor">▊</span>');
+                            scrollToBottom();
+                        } else if (payload.type === 'response') {
+                            finalResponse = payload.content;
+                        } else if (payload.type === 'image') {
+                            const imgContainer = document.createElement('div');
+                            imgContainer.className = 'generated-image-container';
+                            imgContainer.innerHTML = `<img src="${payload.image_url}" class="generated-image" alt="Generated Image" loading="lazy">`;
+                            contentDiv.appendChild(imgContainer);
+                        } else if (payload.type === 'session') {
+                            currentSessionId = payload.session_id;
+                            localStorage.setItem('chatbot_session_id', currentSessionId);
+                            updateHistory();
+                        }
                     } catch (parseErr) {
                         if (line.trim() !== "data: [DONE]" && !line.startsWith(":")) {
                             console.warn("SSE Parse Error:", parseErr, "Line:", line);

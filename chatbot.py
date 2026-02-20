@@ -50,7 +50,6 @@ class PinnacleChatbot:
         """
         Initialize the chatbot with an MCP manager and session ID.
         """
-        
 
         # Initialize clients
         self.hf_client = None
@@ -522,22 +521,37 @@ class PinnacleChatbot:
         """Determine which specific tools are relevant based on keywords."""
         msg = user_message.lower()
         tools = []
-        
+
         # Image Generation
-        if any(kw in msg for kw in ["image", "picture", "photo", "draw", "logo", "icon", "design"]):
+        if any(
+            kw in msg
+            for kw in ["image", "picture", "photo", "draw", "logo", "icon", "design"]
+        ):
             tools.append("generate_image")
-            
+
         # Lead Capture
-        if any(kw in msg for kw in ["contact", "email", "message", "hire", "project", "quote", "discuss", "call me"]):
+        if any(
+            kw in msg
+            for kw in [
+                "contact",
+                "email",
+                "message",
+                "hire",
+                "project",
+                "quote",
+                "discuss",
+                "call me",
+            ]
+        ):
             tools.append("send_lead_email")
-            
+
         return tools
 
     async def _format_tools_for_litellm(
         self, tool_filter: Optional[List[str]] = None
     ) -> Optional[List[Dict[str, Any]]]:
         """Format MCP tools for LiteLLM with EXTREME token saving"""
-        mcp_tools = []
+        mcp_tools: List[Dict[str, Any]] = []
 
         # Add Hugging Face MCP tools if client is available
         if self.hf_client:
@@ -847,9 +861,7 @@ class PinnacleChatbot:
                     result_obj = None
 
                     try:
-                        result = await self._execute_mcp_tool(
-                            function_name, function_args
-                        )
+                        result = await self._execute_tool(function_name, function_args)
                         # Store last tool result for potential use if AI doesn't respond
                         # We keep it as an object for image detection below
                         result_obj = result
@@ -1697,5 +1709,3 @@ class PinnacleChatbot:
                 logger.error(f"Pollinations fallback failed: {e}")
 
             return {"error": "Image generation failed. Please try again."}
-
-        

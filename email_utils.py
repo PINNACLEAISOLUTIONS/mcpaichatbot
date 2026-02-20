@@ -76,16 +76,20 @@ def send_lead_email(lead_data: dict) -> bool:
         # Connect and send with enhanced diagnostics
         logger.info(f"Connecting to SMTP host {smtp_host}:{smtp_port}...")
         server = smtplib.SMTP(smtp_host, int(smtp_port), timeout=15)
-        
+
         logger.info("Starting TLS...")
         server.starttls()
-        
+
+        if not smtp_pass:
+            logger.error("❌ SMTP Login failed: No password provided.")
+            return False
+
         logger.info(f"Attempting SMTP login for {smtp_user}...")
-        server.login(smtp_user, smtp_pass)
-        
+        server.login(smtp_user, str(smtp_pass))
+
         logger.info(f"Sending message to {lead_to}...")
         server.send_message(msg)
-        
+
         server.quit()
         logger.info(f"✅ Lead email sent successfully to {lead_to}")
         return True
