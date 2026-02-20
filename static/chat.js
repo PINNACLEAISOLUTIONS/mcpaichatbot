@@ -1,25 +1,9 @@
-// --- Global Variables (Safe Scoping) ---
-let messageIdCounter = 0;
-let currentSessionId = localStorage.getItem('chatbot_session_id');
-
 document.addEventListener('DOMContentLoaded', () => {
-    // Select elements with error checking
     const chatMessages = document.getElementById('chat-messages');
     const userInput = document.getElementById('user-input');
     const sendBtn = document.getElementById('send-btn');
     const statusDot = document.querySelector('.status-dot');
     const statusText = document.querySelector('.status-text');
-
-    if (!chatMessages || !userInput || !sendBtn) {
-        console.error("CRITICAL: Essential UI elements missing!");
-        return;
-    }
-
-    // Helper to update status UI safely
-    function setStatus(status, color = '#22c55e') {
-        if (statusDot) statusDot.style.background = color;
-        if (statusText) statusText.textContent = status;
-    }
 
     const micBtn = document.getElementById('mic-btn');
     const hdToggleBtn = document.getElementById('hd-toggle-btn');
@@ -33,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const DEBUG_MOBILE = false;
     let isChatOpen = true;
     let debugMode = false;
-    // currentSessionId is now global
+    let currentSessionId = localStorage.getItem('chatbot_session_id');
     let useHDMode = false; // HD = Groq Whisper, STD = Browser API
     let autoSpeak = false;
     let isSpeaking = false;
@@ -389,14 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const payload = JSON.parse(line.slice(6));
                         if (payload.type === 'token') {
                             accumulated += payload.content;
-                            // Safer marked usage
-                            if (typeof marked === 'object' && typeof marked.parse === 'function') {
-                                contentDiv.innerHTML = marked.parse(accumulated + '<span class="streaming-cursor">▊</span>');
-                            } else if (typeof marked === 'function') {
-                                contentDiv.innerHTML = marked(accumulated + '<span class="streaming-cursor">▊</span>');
-                            } else {
-                                contentDiv.textContent = accumulated;
-                            }
+                            contentDiv.innerHTML = marked.parse(accumulated + '<span class="streaming-cursor">▊</span>');
                             scrollToBottom();
                         } else if (payload.type === 'response') {
                             finalResponse = payload.content;
@@ -418,44 +395,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Finalize message display
+            // Finalize message
             const displayText = finalResponse || accumulated;
-            if (displayText) {
-                // Safer marked usage
-                if (typeof marked === 'object' && typeof marked.parse === 'function') {
-                    contentDiv.innerHTML = marked.parse(displayText);
-                } else if (typeof marked === 'function') {
-                    contentDiv.innerHTML = marked(displayText);
-                } else {
-                    contentDiv.textContent = displayText;
-                }
-            }
-            if (loader && loader.remove) loader.remove();
-
-            if (actionsDiv) {
-                actionsDiv.style.display = '';
-                const sBtn = div.querySelector('.speak-btn');
-                if (sBtn) {
-                    sBtn.addEventListener('click', () => {
-                        if (isSpeaking && currentSpeakingMsgId === msgId) stopSpeaking();
-                        else if (voiceModeActive) speakWithElevenLabs(displayText, msgId);
-                        else speakTextBrowser(displayText, msgId);
-                    });
-                }
-            }
+            contentDiv.innerHTML = marked.parse(displayText);
+            actionsDiv.style.display = '';
+            div.querySelector('.speak-btn').addEventListener('click', () => {
+                if (isSpeaking && currentSpeakingMsgId === msgId) stopSpeaking();
+                else if (voiceModeActive) speakWithElevenLabs(displayText, msgId);
+                else speakTextBrowser(displayText, msgId);
+            });
             scrollToBottom();
 
             // Auto-speak after stream completes
-            if (autoSpeak && msgId && displayText) {
+            if (autoSpeak && msgId) {
                 if (voiceModeActive) speakWithElevenLabs(displayText, msgId);
                 else speakTextBrowser(displayText, msgId);
             }
 
-        } catch (err) {
-            console.error("Chat Error:", err);
-            if (typeof loader !== 'undefined' && loader && loader.remove) loader.remove();
-            addErrorMessage("Connection failed. Please check your internet or try again.");
-        }
+        } catch (err) { loader.remove(); addErrorMessage("Connection failed."); }
         sendBtn.disabled = false;
     }
 
@@ -474,14 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
         div.className = 'message assistant-message';
         div.setAttribute('data-msg-id', msgId);
 
-        // Safer marked usage
-        let contentHtml = text;
-        if (typeof marked === 'object' && typeof marked.parse === 'function') {
-            contentHtml = marked.parse(text);
-        } else if (typeof marked === 'function') {
-            contentHtml = marked(text);
-        }
-
+        let contentHtml = marked.parse(text);
         if (data && data.image_url) {
             contentHtml += `<div class="generated-image-container"><img src="${data.image_url}" class="generated-image" alt="Generated Image" loading="lazy"></div>`;
         }
