@@ -139,7 +139,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let fullTranscript = '';
             for (let i = 0; i < event.results.length; ++i) {
-                fullTranscript += event.results[i][0].transcript;
+                let chunk = event.results[i][0].transcript;
+                if (!chunk.trim()) continue;
+
+                // Strip spaces/punctuation to check if this chunk is just an Android-style progressive duplication
+                let cleanChunk = chunk.toLowerCase().replace(/[\W_]+/g, "");
+                let cleanFull = fullTranscript.toLowerCase().replace(/[\W_]+/g, "");
+
+                if (cleanFull && cleanChunk.startsWith(cleanFull)) {
+                    // This chunk CONTAINS the entirety of the previous transcript (Mobile Chrome Bug)
+                    fullTranscript = chunk;
+                } else {
+                    // Standard chunk appending (Desktop Chrome)
+                    fullTranscript += chunk;
+                }
             }
             if (fullTranscript) {
                 userInput.value = fullTranscript;
