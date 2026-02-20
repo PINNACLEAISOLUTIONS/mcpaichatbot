@@ -172,12 +172,12 @@ static_path.mkdir(exist_ok=True)
 static_generated_path.mkdir(exist_ok=True)
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def read_index():
     return FileResponse(str(static_path / "index.html"))
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     """Health check endpoint for Render deployment."""
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
