@@ -5,6 +5,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusDot = document.querySelector('.status-dot');
     const statusText = document.querySelector('.status-text');
 
+    // Helper to update status UI safely
+    function setStatus(status, color = '#22c55e') {
+        if (statusDot) statusDot.style.background = color;
+        if (statusText) statusText.textContent = status;
+    }
+
     const micBtn = document.getElementById('mic-btn');
     const hdToggleBtn = document.getElementById('hd-toggle-btn');
     const autoSpeakToggle = document.getElementById('auto-speak-toggle');

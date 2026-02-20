@@ -6,6 +6,7 @@ function getApiBaseUrl() {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         return 'http://localhost:8001';
     }
-    // Otherwise use the production Render URL
-    return BACKEND_URL;
+    // Otherwise use relative paths (empty string) for better reliability
+    // This allows the browser to automatically use the current origin
+    return '';
 }
