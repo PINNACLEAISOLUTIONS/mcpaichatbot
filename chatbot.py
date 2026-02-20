@@ -129,6 +129,7 @@ class PinnacleChatbot:
             "### YOUR BEHAVIOR:\n"
             "- **Ask Questions**: When a user mentions a need, ask clarifying questions to provide expert ideas.\n"
             "- **Be Direct**: When a user wants to contact us or start a project, get their **Name**, **Email**, and **Brief Needs**, then call the 'send_lead_email' tool immediately. Do NOT use a step-by-step questionnaire.\n"
+            "- **For General Knowledge**: If a user asks a basic fact or general question (e.g., 'What is the capital of England?'), just answer it directly. Do NOT try to connect it back to Pinnacle AI or force a sales pitch.\n"
             "- **Professionalism**: Use clear, concise, and technically accurate language."
         )
 
