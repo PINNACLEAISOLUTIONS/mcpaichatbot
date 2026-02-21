@@ -22,6 +22,7 @@ import db_utils
 from chatbot import PinnacleChatbot
 from gemini_image_client import GeminiImageClient
 from voice_agent import VoiceAgent
+import email_utils
 
 # Load env
 load_dotenv(override=True)
@@ -340,6 +341,12 @@ async def status_endpoint():
         "version": APP_VERSION,
         "voice_agent": voice_agent.get_status() if voice_agent else None,
         "database": db_utils.check_db_connection(),
+        "email": {
+            "configured": email_utils.check_email_config(),
+            "smtp": bool(os.getenv("SMTP_PASS") or os.getenv("GMAIL_APP_PASSWORD")),
+            "sendgrid": bool(os.getenv("SENDGRID_API_KEY")),
+            "resend": bool(os.getenv("RESEND_API_KEY")),
+        },
     }
 
 

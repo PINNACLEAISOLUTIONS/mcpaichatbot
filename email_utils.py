@@ -6,8 +6,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import resend  # type: ignore
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from sendgrid import SendGridAPIClient  # type: ignore
+from sendgrid.helpers.mail import Mail  # type: ignore
 
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,7 @@ def send_lead_email(lead_data: dict) -> bool:
         msg["Subject"] = f"🚀 New Project: {lead_data.get('name')} - Pinnacle AI"
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        body = f"""
+        body = """
         <h2>New Project Inquiry Captured</h2>
         <p>A new inquiry has been captured via the Pinnacle AI Expert Chatbot.</p>
         <hr>
