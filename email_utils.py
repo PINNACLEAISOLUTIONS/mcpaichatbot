@@ -6,6 +6,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import resend  # type: ignore
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 
 logger = logging.getLogger(__name__)
@@ -42,14 +44,30 @@ def send_lead_email(lead_data: dict) -> bool:
     Uses environment variables for configuration with hardcoded fallbacks.
     """
     # Hardcoded fallbacks for Pinnacle AI Expert Notifications
-    smtp_host = os.getenv("SMTP_HOST") or "smtp.gmail.com"
-    smtp_port = os.getenv("SMTP_PORT") or "587"
-    smtp_user = os.getenv("SMTP_USER") or "futureai4all@gmail.com"
-    smtp_pass = os.getenv("SMTP_PASS")
-    lead_to = os.getenv("LEAD_TO_EMAIL") or "futureai4all@gmail.com"
+    smtp_host = os.getenv("SMTP_HOST") or os.getenv("GMAIL_HOST") or "smtp.gmail.com"
+    smtp_port = os.getenv("SMTP_PORT") or os.getenv("GMAIL_PORT") or "587"
+    smtp_user = (
+        os.getenv("SMTP_USER") or os.getenv("GMAIL_USER") or "futureai4all@gmail.com"
+    )
+    smtp_pass = os.getenv("SMTP_PASS") or os.getenv("GMAIL_APP_PASSWORD")
+    lead_to = (
+        os.getenv("LEAD_TO_EMAIL")
+        or os.getenv("GMAIL_USER")
+        or "futureai4all@gmail.com"
+    )
 
-    if not all([smtp_host, smtp_user, smtp_pass, lead_to]):
-        logger.error("❌ Email failed: Missing SMTP configuration.")
+    # API Keys
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
+
+    # Check if we have ANY way to send email
+    has_smtp = all([smtp_host, smtp_user, smtp_pass, lead_to])
+    has_api = any([resend_api_key, sendgrid_api_key])
+
+    if not has_smtp and not has_api:
+        logger.error(
+            f"❌ Email failed: No configuration found. Checked SMTP, Resend, and SendGrid."
+        )
         return False
 
     try:
@@ -94,9 +112,27 @@ def send_lead_email(lead_data: dict) -> bool:
                 logger.info(f"✅ Lead email sent successfully via Resend to {lead_to}")
                 return True
             except Exception as resend_err:
-                logger.warning(
-                    f"⚠️ Resend failed ({resend_err}). Falling back to SMTP..."
+                logger.warning(f"⚠️ Resend failed ({resend_err}). Trying SendGrid...")
+
+        # Try SendGrid if API key is present
+        sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
+        if sendgrid_api_key:
+            try:
+                logger.info("Attempting to send email via SendGrid API...")
+                message = Mail(
+                    from_email=os.getenv("SENDGRID_FROM", "futureai4all@gmail.com"),
+                    to_emails=lead_to,
+                    subject=f"🚀 New Project: {lead_data.get('name')} - Pinnacle AI",
+                    html_content=body,
                 )
+                sg = SendGridAPIClient(sendgrid_api_key)
+                sg.send(message)
+                logger.info(
+                    f"✅ Lead email sent successfully via SendGrid to {lead_to}"
+                )
+                return True
+            except Exception as sg_err:
+                logger.warning(f"⚠️ SendGrid failed ({sg_err}). Falling back to SMTP...")
 
         # SMTP Fallback
         # Connect and send with enhanced diagnostics
@@ -132,13 +168,16 @@ def send_lead_email(lead_data: dict) -> bool:
 
 
 def check_email_config() -> bool:
-    """Verify if email configuration is present."""
-    return all(
+    """Verify if any email configuration is present."""
+    return any(
         [
-            os.getenv("SMTP_HOST"),
-            os.getenv("SMTP_PORT"),
-            os.getenv("SMTP_USER"),
-            os.getenv("SMTP_PASS"),
-            os.getenv("LEAD_TO_EMAIL"),
+            os.getenv("RESEND_API_KEY"),
+            os.getenv("SENDGRID_API_KEY"),
+            all(
+                [
+                    os.getenv("SMTP_PASS") or os.getenv("GMAIL_APP_PASSWORD"),
+                    os.getenv("SMTP_USER") or os.getenv("GMAIL_USER"),
+                ]
+            ),
         ]
     )
