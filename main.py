@@ -180,6 +180,8 @@ async def read_index():
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     """Health check endpoint for Render deployment."""
+    print("⚡ UptimeRobot Ping Received! (Keeping bot awake)")
+    logger.info("Health check ping received.")
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 
