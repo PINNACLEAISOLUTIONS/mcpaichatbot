@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const systemAudio = new Audio();
 
     // Isolated Session Storage Key per Brand
-    const sessionKey = 'chatbot_session_id_' + activeBrand;
+    const sessionKey = 'chatbot_session_v2_' + activeBrand;
     let currentSessionId = localStorage.getItem(sessionKey);
     if (!currentSessionId) {
         currentSessionId = 'sess_' + activeBrand + '_' + Math.random().toString(36).substring(2, 10);

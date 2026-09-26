@@ -119,6 +119,12 @@ class PinnacleChatbot:
 
         self.model = "groq/llama-3.3-70b-versatile"  # Default model
 
+        # Resolve Brand dynamically FIRST
+        self.brand = brand.resolve_brand(brand_name)
+        self.is_miami = self.brand == "miami"
+        self.phone = "(786) 570-3215" if self.is_miami else "(904) 686-6593"
+        self.default_region = "Miami, Florida" if self.is_miami else "Global"
+
         # Business Assistant State
         self.knowledge_base = self._load_business_knowledge()
         self.lead_state: Dict[str, Any] = {
@@ -126,22 +132,16 @@ class PinnacleChatbot:
             "field": None,
             "data": {},
             "awaiting_permission": False,
-            "fields_to_collect": [],  # Streamlined: handled via tool call directly
+            "fields_to_collect": [],
         }
 
-        # ========== LOCAL BUSINESS CONTEXT (ADDITIVE) ==========
         # Tracks user location for personalized local business advice
         self.location_context: Dict[str, Any] = {
             "detected": False,
-            "region": None,  # e.g., "North Florida", "Jacksonville area"
-            "city": None,  # e.g., "Jacksonville", "Gainesville"
-            "state": None,  # e.g., "Florida", "FL"
+            "region": None,
+            "city": None,
+            "state": None,
         }
-        # Resolve Brand dynamically
-        self.brand = brand.resolve_brand(brand_name)
-        self.is_miami = self.brand == "miami"
-        self.phone = "(786) 570-3215" if self.is_miami else "(904) 686-6593"
-        self.default_region = "Miami, Florida" if self.is_miami else "Global"
 
         # Session management
         self.sessions_dir = Path("sessions")
@@ -175,7 +175,8 @@ class PinnacleChatbot:
 
     def _load_business_knowledge(self) -> str:
         """Load business_knowledge.md content into memory."""
-        kb_path = Path("miami_knowledge.md" if getattr(self, 'is_miami', False) else "business_knowledge.md")
+        is_miami = getattr(self, 'is_miami', False) or getattr(self, 'brand', '') == 'miami'
+        kb_path = Path("miami_knowledge.md" if is_miami else "business_knowledge.md")
         if kb_path.exists():
             try:
                 return kb_path.read_text(encoding="utf-8")
@@ -463,7 +464,7 @@ class PinnacleChatbot:
                 return f"The user is in {state}. Adjust your recommendations for that market."
 
         # Default to home region
-        company = "Miami Loves Green Landscaping" if brand.IS_MIAMI else "Pinnacle AI Solutions"
+        company = "Miami Loves Green Landscaping" if self.is_miami else "Pinnacle AI Solutions"
         return f"When discussing local business strategies, you may reference {self.default_region} as the home region for {company}."
 
     def load_history(self, session_id: str) -> List[Dict]:
@@ -483,7 +484,13 @@ class PinnacleChatbot:
 
             if row:
                 self.session_title = row[0]
-                return json.loads(row[1])
+                history = json.loads(row[1])
+                # Safety Sanitization: purge old polluted landscaping history for Pinnacle AI
+                if not getattr(self, 'is_miami', False) and history:
+                    if any("landscap" in str(m.get("content", "")).lower() or "miami loves green" in str(m.get("content", "")).lower() for m in history):
+                        logger.warning(f"Purging old polluted landscaping history for Pinnacle session {session_id}")
+                        history = []
+                return history
             return []
         except Exception as e:
             logger.error(f"Failed to load session {session_id} from DB: {e}")
@@ -756,7 +763,7 @@ class PinnacleChatbot:
                 res_content = await self._start_lead_capture()
                 return {"response": res_content}
             elif any(kw in msg_lower for kw in negative_keywords):
-                res_content = "No problem! Feel free to ask me any questions about our services, or request a quote whenever you're ready. You can also contact us directly at 352-231-9154 or futureai4all@gmail.com."
+                res_content = "No problem! Feel free to ask me any questions about our services, or request a quote whenever you're ready. You can also contact us directly at (904) 686-6593 or futureai4all@gmail.com."
                 return {"response": res_content}
             else:
                 res_content = "I didn't quite catch that. Would you like me to proceed with collecting your information for a quote? (Please say 'yes' or 'no')"

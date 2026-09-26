@@ -237,7 +237,7 @@ async def chat_endpoint(chat_msg: ChatMessage, request: Request):
             detail="You've reached the message limit for this session. Please start a new chat.",
         )
 
-    cache_key = (session_id, user_message)
+    cache_key = (chat_msg.brand or 'pinnacle', session_id, user_message)
     if cache_key in response_cache:
         cached_data = response_cache[cache_key]
         if (
@@ -251,7 +251,7 @@ async def chat_endpoint(chat_msg: ChatMessage, request: Request):
     session_request_counts[session_id].append(now)
     session_total_counts[session_id] += 1
 
-    chatbot_instance = get_chatbot(session_id)
+    chatbot_instance = get_chatbot(session_id, brand_name=chat_msg.brand)
     try:
         response = await chatbot_instance.send_message(user_message)
         if isinstance(response, dict) and "response" in response:
@@ -307,7 +307,7 @@ async def chat_stream_endpoint(chat_msg: ChatMessage, request: Request):
     session_request_counts[session_id].append(now)
     session_total_counts[session_id] += 1
 
-    chatbot_instance = get_chatbot(session_id)
+    chatbot_instance = get_chatbot(session_id, brand_name=chat_msg.brand)
 
     async def event_generator():
         import json as _json

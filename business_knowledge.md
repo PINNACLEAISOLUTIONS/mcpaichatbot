@@ -1,65 +1,76 @@
-# Pinnacle AI Solutions - Business Knowledge Base
-
-## Core Identity & Mission
-
-Pinnacle AI Solutions (https://pinnacleaisolutions.site) is an elite artificial intelligence engineering and automation agency. We architect custom AI agents, AI phone receptionists, stealth web scrapers, automated social media/marketing posters, and high-performance lead-capture web applications for businesses that want to automate the complex and scale operations.
-
-- **Primary Contact Phone**: **(904) 686-6593** (or 904-686-6593)
-- **Primary Contact Email**: **futureai4all@gmail.com**
-- **Website**: https://pinnacleaisolutions.site
-- **Headquarters / Area Served**: United States & Global Enterprise Clients
-
-> **Identity Guardrail**: Pinnacle AI Solutions is exclusively a software, AI, and automation agency. We do **NOT** provide landscaping, lawn care, or yard work directly. If an inquiry is received regarding landscaping in Florida, politely clarify that Pinnacle AI develops AI systems and direct them to our partner **Miami Loves Green Landscaping** (miamilovesgreenlandscaping.com / 786-570-3215).
+# Pinnacle AI Solutions - Comprehensive Business Knowledge Base
+Website: https://pinnacleaisolutions.site
+Phone: (904) 686-6593
+Email: futureai4all@gmail.com
 
 ---
 
-## Core Pillars & Service Offerings
-
-### 1. AI Phone Receptionists & 24/7 Voice Agents
-Human-like conversational voice agents that answer inbound business calls 24/7, qualify leads, schedule appointments, and sync data directly to CRMs.
-- **Ultra-Low Latency**: Sub-second (<800ms) voice response time using advanced speech synthesis and neural streaming.
-- **Natural Multi-turn Dialogue**: Handles interruptions (barge-in), background noise, customer accents, and complex multi-part questions.
-- **Automated Booking & Intake**: Directly books appointments to Google Calendar, Outlook, Calendly, or custom booking engines.
-- **Call Screening & Intelligent Routing**: Filters spam, screens prospects, and transfers high-priority urgent calls to live staff.
-- **CRM Sync & Post-Call Action**: Automatically summarizes calls, logs transcripts, updates CRM fields (HubSpot, Salesforce, Zoho, Google Sheets), and triggers confirmation SMS or emails.
-
-### 2. Custom AI Agents & Autonomous Workflows
-Autonomous intelligent systems that execute multi-step workflows without human intervention.
-- **Multi-Agent Systems**: Coordinated swarms of specialized agents solving complex operational tasks.
-- **Business Process Automation**: Eliminating manual data entry, customer follow-ups, invoice processing, and report generation.
-- **Autonomous Outreach Specialists**: Agents that identify prospects, draft personalized messages, and follow up automatically.
-- **Self-Healing Infrastructure**: Error-recovery loops that detect failures, retry with fallbacks, and log anomalies.
-
-### 3. Stealth Web Scrapers & High-Scale Data Extraction
-Undetectable, resilient data extraction engines built to extract mission-critical business intelligence and qualified leads at scale.
-- **Platform Specialization**:
-  - **Google Maps Lead Scraper**: Extracts business names, phone numbers, verified emails, addresses, review ratings, and websites for any niche and geographic area.
-  - **Craigslist & Marketplace Scrapers**: Real-time monitoring for high-value leads, job postings, and listings.
-  - **Social & Directory Scrapers**: Facebook Groups, LinkedIn, Yelp, YellowPages, industry directories.
-- **Anti-Bot Evasion**: Automated residential proxy rotation, browser fingerprint spoofing, TLS/JA3 masquerading, and human cursor simulation.
-- **Clean Delivery**: Data delivered in structured CSV, JSON, Google Sheets, or piped straight into client databases.
-
-### 4. Auto-Posters & Marketing Automation
-Automated content distribution and marketing systems that keep businesses visible across multiple platforms.
-- **Scheduled Multi-Platform Posting**: Automated distribution across Facebook, Craigslist, Twitter/X, Instagram, and web directories.
-- **Dynamic Content Variation**: Prevents duplicate-content flags by automatically spinning headlines, images, and copy variations using AI.
-- **Lead Capture & Instant Response**: Auto-responds to incoming inquiries, comments, and messages with tailored qualification scripts.
-
-### 5. High-Performance Web Development & Chatbot Integrations
-Modern, lightning-fast web applications and bespoke AI chatbot widgets that turn visitors into paying customers.
-- **Technology Stack**: Next.js, React, TypeScript, FastAPI, Python, Tailwind CSS, LiteLLM, WebSockets.
-- **Advanced RAG (Retrieval-Augmented Generation)**: Chatbots trained exclusively on your business data and offerings.
-- **Multimodal Capabilities**: Chatbots that can listen to voice, speak with studio-grade natural voices, and process images.
-- **Conversion-Optimized UI**: Seamless slide-in and popup widgets, responsive on mobile devices and desktops, with frictionless lead capture.
+## 🛑 ABSOLUTE GUARDRAIL - READ FIRST:
+Pinnacle AI Solutions is exclusively an Artificial Intelligence, Automation, and Software Engineering agency.
+We do NOT do physical landscaping, lawn mowing, gardening, sprinkler installation, or yard work.
+NEVER say "We handle everything about landscaping" or describe lawn services.
+If an inquiry specifically asks about physical landscaping in South Florida, state:
+"Pinnacle AI Solutions specializes in AI automation, AI phone receptionists, autonomous agents, and custom software. For premier landscaping in South Florida, please visit our partner Miami Loves Green Landscaping at https://miamilovesgreenlandscaping.com or call (786) 570-3215."
 
 ---
 
-## Contact & Lead Acquisition Workflow
+## About Pinnacle AI Solutions
+Pinnacle AI Solutions builds custom AI agents, AI phone receptionists, stealth lead scrapers, auto-posters, and high-performance lead-capture websites that find, reach, and book customers for your business. We help businesses automate manual operations, eliminate missed calls, capture qualified leads 24/7, and scale revenue with intelligent automation.
 
-When a visitor wants a demo, consultation, audit, or project quote:
-1. Enthusiastically welcome their interest.
-2. Ask for their **Name**, **Email**, **Phone Number**, and a **Brief Description of their project/needs**.
-3. Call the send_lead_email tool immediately with the captured information.
-4. Notify the user that a senior technical specialist from Pinnacle AI Solutions will contact them within **24 business hours**.
-- **Phone**: **(904) 686-6593**
+---
+
+## Core Services (From Our Website)
+
+### 1. Custom Websites & High-Converting Landing Pages
+Professional web applications and landing pages featuring cutting-edge animations, responsive design, and conversion-optimized layouts that elevate your brand.
+- **Lead-Capture Forms**: Automated forms with instant SMS and email notifications when a lead submits.
+- **Instant Follow-Up**: Automated SMS/email follow-up dispatched to every inquiry within seconds.
+- **Built-In AI Chatbot**: Conversational AI widgets integrated directly into the site to answer questions and convert visitors 24/7.
+- **Modern Tech Stack**: Next.js, React, Tailwind CSS, FastAPI, Three.js 3D animations, GSAP interactions.
+
+### 2. Chat Box Integration & 24/7 Customer Support Bots
+Enterprise-grade AI chatbots designed specifically for your business to provide 24/7 customer support, qualify leads, and schedule consultations.
+- **Custom-Trained**: Trained exclusively on your company's offerings, packages, pricing, and FAQs.
+- **Lead Qualification**: Captures visitor name, phone number, email, and specific project needs, then books appointments directly into calendars.
+- **Omnichannel**: Deploys seamlessly on your website, SMS messaging, and Facebook Messenger.
+
+### 3. Custom AI Solutions & Automation Workflows
+Tailored artificial intelligence systems designed specifically for your business operations.
+- **Auto-Posters**: Scheduled multi-platform posting to social media (Facebook, Instagram, X/Twitter, Craigslist) and Google Business Profile.
+- **AI Content Generation**: Automated short-form video creation and engaging captions.
+- **Workflow Automation**: Custom n8n, Zapier, and Python automation pipelines that connect your CRM, calendars, email, and databases.
+
+### 4. AI Voice Agents & 24/7 AI Phone Receptionists
+Natural-sounding conversational voice agents that answer your business phone line around the clock so every caller is greeted, qualified, and booked — even after hours or on weekends.
+- **24/7 Inbound Answering**: Zero missed calls. Sub-second voice response latency with natural human tone.
+- **Lead Qualification & Booking**: Answers customer questions, screens prospects, and books appointments directly to Google Calendar, Outlook, or Calendly.
+- **Call Summaries & Follow-Up**: Instantly sends call recordings, full transcripts, and summaries to your email/CRM, plus automatic confirmation SMS to the caller.
+- **Battle-Tested Tech**: Powered by Vapi, Twilio, and ElevenLabs neural voices (live implementation deployed for medical clinics and service businesses).
+
+### 5. Custom AI Agents & Multi-Agent Workflows
+Autonomous intelligent agents designed and built around how your business actually runs, handling complex multi-step work across your tools.
+- **Tailored Workflows**: Built specifically for your operations and business goals.
+- **Tool Integration**: Connects directly to your CRM (HubSpot, Salesforce, Zoho), calendar, email, and Google Sheets.
+- **Autonomous Operations**: Handles automated prospect research, follow-ups, and repetitive data entry.
+- **Fully Managed**: We architect, test, launch, and continuously maintain your agents.
+
+### 6. Custom Lead Scrapers & Data Extraction Engines
+Automated lead generation systems that extract targeted prospects from multiple high-intent sources, filter by your exact criteria, and deliver clean data to your CRM.
+- **Google Maps Lead Scraper**: Extracts business names, verified phone numbers, emails, addresses, review ratings, and websites by niche and city.
+- **Marketplace & Group Scrapers**: Real-time monitoring for high-intent buyer posts from public Facebook Groups, Craigslist, and web directories.
+- **Clean Delivery**: Verified contacts exported to structured CSV, Google Sheets, or directly injected into your CRM.
+
+---
+
+## Core Programs & Offerings
+- **1-on-1 Virtual Training**: Personalized AI implementation training and executive coaching with a free initial consultation.
+- **Custom Website Development**: Visually stunning and high-converting modern web platforms.
+- **Web Scraping Programs**: Bespoke automated data extraction tools.
+- **Custom AI Chatbots**: Conversational AI tailored to your exact industry.
+
+---
+
+## Contact & Booking Information
+- **Phone**: **(904) 686-6593** (Call or text for consultations and free AI audits)
 - **Email**: **futureai4all@gmail.com**
+- **Website**: **https://pinnacleaisolutions.site**
