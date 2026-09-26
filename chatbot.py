@@ -1307,6 +1307,16 @@ class PinnacleChatbot:
         else:
             messages = messages.copy()
 
+        # Old sessions can hold tool/tool_call entries from the non-stream path;
+        # orphaned ones make every provider reject the request. Send plain text only.
+        messages = [
+            {"role": m["role"], "content": m["content"]}
+            for m in messages
+            if m.get("role") in ("system", "user", "assistant")
+            and isinstance(m.get("content"), str)
+            and m["content"].strip()
+        ]
+
         unique_chain = self._model_chain()
 
         # Free-tier limits are per-minute: if every model is rate limited,
@@ -1321,6 +1331,8 @@ class PinnacleChatbot:
                     "max_tokens": 512,
                     "temperature": 0.7,
                     "stream": True,
+                    "timeout": 20,  # a hung model shouldn't stall the whole chain
+                    "num_retries": 0,  # our chain is the retry strategy
                 }
                 if model_name.startswith("gemini/") and self.gemini_api_key:
                     completion_kwargs["api_key"] = self.gemini_api_key
