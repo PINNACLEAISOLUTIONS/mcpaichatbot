@@ -30,26 +30,60 @@ log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 logger = logging.getLogger(__name__)
 
-# Last failure per model, surfaced at /api/status so "high demand" can be diagnosed
-# without Render log access. Values are scrubbed of anything key-like.
+# Last failure per model, surfaced at /api/status and /health/llm so "high demand"
+# can be diagnosed without Render log access. Public, so store ONLY a category:
+# raw provider errors can echo user messages. Full text goes to the server log.
 LLM_ERRORS: Dict[str, str] = {}
+
+# Providers retire model names without notice (Groq llama-3.x, Gemini 2.0 all went
+# 404 in 2026). Models that 404 are skipped for DEAD_MODEL_TTL; Groq's current
+# lineup is discovered from its /models API instead of being hardcoded.
+DEAD_MODEL_TTL = 6 * 3600
+_DEAD_MODELS: Dict[str, float] = {}
+_GROQ_MODELS: Dict[str, Any] = {"checked": 0.0, "ids": []}
+_GROQ_PREFERENCE = ["llama-3.3-70b", "gpt-oss-120b", "llama-4-maverick", "llama-4-scout",
+                    "kimi-k2", "qwen3", "gpt-oss-20b", "llama-3.1-8b"]
+_GROQ_EXCLUDE = ["whisper", "guard", "tts", "playai", "orpheus", "compound", "distil"]
+
+
+async def _groq_models(api_key: str) -> List[str]:
+    """Best 3 chat models the Groq key can use right now (cached 6h)."""
+    if time.time() - _GROQ_MODELS["checked"] < DEAD_MODEL_TTL:
+        return _GROQ_MODELS["ids"]
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get("https://api.groq.com/openai/v1/models",
+                                 headers={"Authorization": f"Bearer {api_key}"})
+            r.raise_for_status()
+        ids = [m["id"] for m in r.json().get("data", []) if m.get("active", True)
+               and not any(x in m["id"].lower() for x in _GROQ_EXCLUDE)]
+        rank = lambda i: next((n for n, p in enumerate(_GROQ_PREFERENCE) if p in i.lower()), 99)
+        _GROQ_MODELS["ids"] = sorted((i for i in ids if rank(i) < 99), key=rank)[:3]
+        logger.info(f"Groq models discovered: {_GROQ_MODELS['ids']}")
+    except Exception as e:
+        logger.warning(f"Groq model discovery failed, keeping previous list: {e}")
+    _GROQ_MODELS["checked"] = time.time()
+    return _GROQ_MODELS["ids"]
 
 
 def _record_llm_error(model_name: str, error: str) -> None:
-    scrubbed = re.sub(r"(key=|Bearer |gsk_|AIza)[A-Za-z0-9_\-]+", r"***", error)
-    LLM_ERRORS[model_name] = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {scrubbed[:300]}"
-
-# LiteLLM Configuration (Production Optimized)
-litellm.set_verbose = False
-if "LITELLM_LOG" in os.environ:
-    del os.environ["LITELLM_LOG"]
-
-# Load environment variables
-load_dotenv(override=True)
-
-# Suppress specific litellm logs
-urllib_log = logging.getLogger("urllib3")
-urllib_log.setLevel(logging.WARNING)
+    low = error.lower()
+    if "does not exist" in low or "no longer available" in low or "notfound" in low or " 404" in low:
+        kind = "model_unavailable"
+    elif "429" in low or "quota" in low or "ratelimit" in low:
+        kind = "rate_limited"
+    elif "timeout" in low or "timed out" in low:
+        kind = "timeout"
+    elif "401" in low or "403" in low or "api key" in low or "authentication" in low:
+        kind = "auth_error"
+    elif error.startswith("empty response"):
+        kind = "empty_response"
+    else:
+        kind = "other_error"
+    logger.warning(f"LLM {model_name} failed ({kind}): {error[:500]}")
+    if kind == "model_unavailable":
+        _DEAD_MODELS[model_name] = time.time()
+    LLM_ERRORS[model_name] = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {kind}"
 
 
 class PinnacleChatbot:
@@ -1284,25 +1318,28 @@ class PinnacleChatbot:
             error_msg = f"I encountered an error: {str(e)}"
             yield f"data: {_json.dumps({'type': 'error', 'content': error_msg})}\n\n"
 
-    def _model_chain(self):
+    async def _model_chain(self):
         """Model fallback order shared by streaming and non-streaming paths.
-        Groq first to save Gemini quota; each Gemini model has its own free-tier
-        quota, so more distinct models = more capacity. Verified live 2026-09-26
-        (gemini-2.0-* and 1.5-* are retired by Google and return 404)."""
+        Groq first (largest free quota), then Gemini lite models (higher free-tier
+        quota than full Flash), each with its own quota bucket. Models that
+        recently returned 404 are skipped."""
         chain = []
         if self.groq_api_key:
-            chain += ["groq/llama-3.3-70b-versatile", "groq/llama-3.1-8b-instant"]
+            chain += ["groq/" + m for m in await _groq_models(self.groq_api_key)]
         if self.gemini_api_key:
             chain += [
+                "gemini/gemini-3.5-flash-lite",
+                "gemini/gemini-flash-lite-latest",
+                "gemini/gemini-3.1-flash-lite",
                 "gemini/gemini-2.5-flash",
                 "gemini/gemini-2.5-flash-lite",
-                "gemini/gemini-3.5-flash-lite",
-                "gemini/gemini-3.1-flash-lite",
-                "gemini/gemini-flash-lite-latest",
+                "gemini/gemini-3.5-flash",
             ]
+        now = time.time()
+        chain = [m for m in chain if now - _DEAD_MODELS.get(m, 0) > DEAD_MODEL_TTL]
         if not chain:
-            logger.warning("No API keys found! Chatbot will not work.")
-            chain = ["groq/llama-3.3-70b-versatile"]  # Will fail but gives clear error
+            logger.warning("No usable models (missing keys or all retired)!")
+            chain = ["gemini/gemini-flash-lite-latest"]
         logger.info(f"Model fallback chain: {chain}")
         return chain
 
@@ -1326,7 +1363,7 @@ class PinnacleChatbot:
             and m["content"].strip()
         ]
 
-        unique_chain = self._model_chain()
+        unique_chain = await self._model_chain()
 
         # Free-tier limits are per-minute: if every model is rate limited,
         # wait briefly and walk the chain once more before giving up.
@@ -1408,7 +1445,7 @@ class PinnacleChatbot:
             messages = [m for m in messages if m.get("role") != "system"]
             messages.insert(0, {"role": "system", "content": combined_content})
 
-        unique_chain = self._model_chain()
+        unique_chain = await self._model_chain()
 
         errors_encountered = []
         max_retries_per_model = 3

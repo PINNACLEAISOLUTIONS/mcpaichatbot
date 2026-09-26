@@ -19,7 +19,7 @@ from pydantic import BaseModel  # type: ignore
 
 # Local imports
 import db_utils
-from chatbot import PinnacleChatbot, LLM_ERRORS
+from chatbot import PinnacleChatbot, LLM_ERRORS, _GROQ_MODELS
 from gemini_image_client import GeminiImageClient
 from voice_agent import VoiceAgent
 import email_utils
@@ -350,6 +350,7 @@ async def status_endpoint():
         "llm": {
             "groq_key": bool(os.getenv("GROQ_API_KEY")),
             "gemini_key": bool(os.getenv("GEMINI_API_KEY")),
+            "groq_models": _GROQ_MODELS["ids"],
             "last_errors": LLM_ERRORS,
         },
     }
