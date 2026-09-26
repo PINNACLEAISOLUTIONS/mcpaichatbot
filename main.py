@@ -19,7 +19,7 @@ from pydantic import BaseModel  # type: ignore
 
 # Local imports
 import db_utils
-from chatbot import PinnacleChatbot
+from chatbot import PinnacleChatbot, LLM_ERRORS
 from gemini_image_client import GeminiImageClient
 from voice_agent import VoiceAgent
 import email_utils
@@ -347,7 +347,38 @@ async def status_endpoint():
             "sendgrid": bool(os.getenv("SENDGRID_API_KEY")),
             "resend": bool(os.getenv("RESEND_API_KEY")),
         },
+        "llm": {
+            "groq_key": bool(os.getenv("GROQ_API_KEY")),
+            "gemini_key": bool(os.getenv("GEMINI_API_KEY")),
+            "last_errors": LLM_ERRORS,
+        },
     }
+
+
+_llm_probe = {"checked": 0.0, "ok": False, "text": ""}
+
+
+@app.api_route("/health/llm", methods=["GET", "HEAD"])
+async def llm_health_check():
+    """Deep health check for UptimeRobot: proves the AI actually answers.
+    Keyword-monitor this for LLM_OK. Cached 4 min so pings don't burn quota."""
+    if time.time() - _llm_probe["checked"] > 240:
+        bot = get_chatbot("uptime-llm-probe")
+        text = ""
+        async for chunk in bot._get_completion_stream(
+            messages=[{"role": "user", "content": "Reply with the single word: ready"}]
+        ):
+            text += chunk
+        _llm_probe.update(
+            checked=time.time(),
+            ok=bool(text.strip()) and "high demand" not in text,
+            text=text.strip()[:80],
+        )
+    body = "LLM_OK" if _llm_probe["ok"] else "LLM_DOWN"
+    return JSONResponse(
+        {"status": body, "reply": _llm_probe["text"], "last_errors": LLM_ERRORS},
+        status_code=200 if _llm_probe["ok"] else 503,
+    )
 
 
 @app.post("/api/tts")

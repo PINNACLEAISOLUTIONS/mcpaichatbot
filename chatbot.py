@@ -30,6 +30,15 @@ log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 logger = logging.getLogger(__name__)
 
+# Last failure per model, surfaced at /api/status so "high demand" can be diagnosed
+# without Render log access. Values are scrubbed of anything key-like.
+LLM_ERRORS: Dict[str, str] = {}
+
+
+def _record_llm_error(model_name: str, error: str) -> None:
+    scrubbed = re.sub(r"(key=|Bearer |gsk_|AIza)[A-Za-z0-9_\-]+", r"***", error)
+    LLM_ERRORS[model_name] = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {scrubbed[:300]}"
+
 # LiteLLM Configuration (Production Optimized)
 litellm.set_verbose = False
 if "LITELLM_LOG" in os.environ:
@@ -1348,10 +1357,13 @@ class PinnacleChatbot:
                         yield delta.content
 
                 if got_content:
+                    LLM_ERRORS["_last_ok"] = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {model_name}"
                     return  # Success — stop trying other models
+                _record_llm_error(model_name, "empty response (no text returned)")
 
             except Exception as e:
                 error_msg = str(e)
+                _record_llm_error(model_name, error_msg)
                 if "429" in error_msg or "quota" in error_msg.lower():
                     logger.warning(
                         f"Stream: {model_name} rate limited, trying next model"
