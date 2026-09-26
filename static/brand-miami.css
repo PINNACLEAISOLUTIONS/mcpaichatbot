@@ -1,0 +1,122 @@
+/* Miami Loves Green theme (served only when BOT_BRAND=miami).
+   Palette matches miamilovesgreenlandscaping.com: deep green + leaf green + gold. */
+body.brand-miami {
+    --bg-dark: #0A1A0A;
+    --accent: #4CAF50;
+    --accent-glow: rgba(76, 175, 80, 0.4);
+    --gold: #FFA726;
+    --user-msg: rgba(18, 48, 18, 0.92);
+    --bot-msg: rgba(10, 26, 10, 0.82);
+    --text-secondary: #b9cdb9;
+    --glass-border: rgba(141, 208, 141, 0.18);
+    background:
+        linear-gradient(180deg, rgba(10, 26, 10, 0.80) 0%, rgba(10, 26, 10, 0.62) 45%, rgba(10, 26, 10, 0.88) 100%),
+        url("/static/miami-bg.webp") center / cover no-repeat,
+        #0A1A0A;
+}
+
+/* Header: logo + name like the company site */
+body.brand-miami .chat-header {
+    background: rgba(10, 26, 10, 0.88);
+    border-bottom: 1px solid rgba(255, 167, 38, 0.35);
+}
+
+body.brand-miami .header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+body.brand-miami .header-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    object-fit: cover;
+    box-shadow: 0 0 0 1px rgba(255, 167, 38, 0.5), 0 4px 14px rgba(76, 175, 80, 0.35);
+}
+
+body.brand-miami .header-text {
+    background: linear-gradient(135deg, #8DD08D, #4CAF50 55%, #FFA726);
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
+/* Banner: inline styles on the page, so these need !important */
+body.brand-miami .brand-banner {
+    background: linear-gradient(90deg, rgba(76, 175, 80, 0.14), rgba(255, 167, 38, 0.10)) !important;
+    border-bottom: 1px solid rgba(255, 167, 38, 0.25) !important;
+}
+
+body.brand-miami .brand-banner h2 {
+    background: linear-gradient(135deg, #8DD08D 0%, #4CAF50 50%, #FFA726 100%) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+}
+
+/* Messages */
+body.brand-miami .assistant-message {
+    background: var(--bot-msg);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-left: 3px solid #4CAF50;
+    backdrop-filter: blur(6px);
+}
+
+body.brand-miami .assistant-message.first {
+    border-left-color: #FFA726;
+}
+
+body.brand-miami .user-message {
+    background: var(--user-msg);
+    border: 1px solid rgba(255, 167, 38, 0.3);
+}
+
+body.brand-miami .message-content a {
+    color: #FFB74D;
+    font-weight: 600;
+}
+
+body.brand-miami .message-content strong {
+    color: #b8e6b8;
+}
+
+/* Input + buttons: gold call-to-action like the site's "free estimate" buttons */
+body.brand-miami .input-container {
+    background: rgba(10, 26, 10, 0.9);
+    border-color: rgba(76, 175, 80, 0.35);
+}
+
+body.brand-miami .send-button {
+    background: linear-gradient(135deg, #FFA726, #FB8C00);
+    color: #0A1A0A;
+}
+
+body.brand-miami .send-button:hover {
+    background: linear-gradient(135deg, #FFB74D, #FFA726);
+}
+
+body.brand-miami .voice-mode-button.active {
+    border-color: #FFA726;
+    box-shadow: 0 0 16px rgba(255, 167, 38, 0.45);
+}
+
+/* Voice Mode button: green/gold instead of Pinnacle's purple/cyan */
+body.brand-miami .voice-mode-button {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.22), rgba(255, 167, 38, 0.14));
+    border-color: rgba(255, 167, 38, 0.45);
+}
+
+body.brand-miami .voice-mode-button:hover {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.38), rgba(255, 167, 38, 0.24));
+}
+
+body.brand-miami .voice-mode-button .voice-text,
+body.brand-miami .voice-mode-button .voice-icon {
+    color: #FFB74D;
+    -webkit-text-fill-color: #FFB74D;
+    background: none;
+}
+
+/* .main-chat paints the solid page color; let the garden photo on <body> show through */
+body.brand-miami .main-chat {
+    background: transparent;
+}

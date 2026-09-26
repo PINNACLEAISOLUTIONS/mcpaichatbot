@@ -22,6 +22,7 @@ import db_utils
 import sqlite3
 import conversation_logger  # Conversation logging (non-intrusive)
 import email_utils
+import brand
 
 
 # Configure logging
@@ -175,6 +176,9 @@ class PinnacleChatbot:
             "- **For General Knowledge**: If a user asks a basic fact or general question (e.g., 'What is the capital of England?'), just answer it directly. Do NOT try to connect it back to Pinnacle AI or force a sales pitch.\n"
             "- **Professionalism**: Use clear, concise, and technically accurate language."
         )
+        if brand.IS_MIAMI:
+            self.system_instruction = brand.MIAMI_SYSTEM_INSTRUCTION
+            self.default_region = "Miami, Florida"
 
         # Session management
 
@@ -197,7 +201,7 @@ class PinnacleChatbot:
 
     def _load_business_knowledge(self) -> str:
         """Load business_knowledge.md content into memory."""
-        kb_path = Path("business_knowledge.md")
+        kb_path = Path("miami_knowledge.md" if brand.IS_MIAMI else "business_knowledge.md")
         if kb_path.exists():
             try:
                 return kb_path.read_text(encoding="utf-8")
@@ -228,6 +232,8 @@ class PinnacleChatbot:
     async def _request_quote_permission(self) -> str:
         """Ask for permission to collect info and email the Pinnacle AI Team."""
         self.lead_state["awaiting_permission"] = True
+        if brand.IS_MIAMI:
+            return brand.MIAMI_LEAD_PERMISSION
         return (
             "I'd be happy to help you get started with a professional inquiry! \n\n"
             "**Please allow me to notify the Pinnacle AI Solutions expert team with your project vision**, "
@@ -261,6 +267,8 @@ class PinnacleChatbot:
             logger.info("Smart filter: Skipping KB for math question")
             return None
         # ========== END SMART FILTER ==========
+        if brand.IS_MIAMI:  # small single-business KB: always give it to the model
+            return self.knowledge_base or None
 
         # ----- ORIGINAL LOGIC BELOW (UNCHANGED) -----
         # Service-related keywords for smarter detection
@@ -478,7 +486,8 @@ class PinnacleChatbot:
                 return f"The user is in {state}. Adjust your recommendations for that market."
 
         # Default to home region
-        return f"When discussing local business strategies, you may reference {self.default_region} as the home region for Pinnacle AI Solutions."
+        company = "Miami Loves Green Landscaping" if brand.IS_MIAMI else "Pinnacle AI Solutions"
+        return f"When discussing local business strategies, you may reference {self.default_region} as the home region for {company}."
 
     def load_history(self, session_id: str) -> List[Dict]:
         """Load conversation history and optional title from SQLite database."""
@@ -527,7 +536,7 @@ class PinnacleChatbot:
         self.conversation_history.append(
             {
                 "role": "assistant",
-                "content": "Hello! I'm Pinnacle AI Expert. I'm here to help you with cutting-edge AI solutions, website development, and automation. How can I assist your business today?",
+                "content": brand.MIAMI_GREETING if brand.IS_MIAMI else "Hello! I'm Pinnacle AI Expert. I'm here to help you with cutting-edge AI solutions, website development, and automation. How can I assist your business today?",
             }
         )
 
@@ -556,7 +565,7 @@ class PinnacleChatbot:
             {"role": "system", "content": self.system_instruction},
             {
                 "role": "assistant",
-                "content": "Hello! I'm Pinnacle AI Expert. I can help you design AI agents, build high-performance websites, or create custom scrapers. What project are you working on?",
+                "content": brand.MIAMI_GREETING if brand.IS_MIAMI else "Hello! I'm Pinnacle AI Expert. I can help you design AI agents, build high-performance websites, or create custom scrapers. What project are you working on?",
             },
         ]
         logger.info("Chat session reset.")
@@ -628,7 +637,7 @@ class PinnacleChatbot:
                 "type": "function",
                 "function": {
                     "name": "send_lead_email",
-                    "description": "Send a 'website request' email to the Pinnacle AI team. Call this when the user wants to contact us, ask a question, or discuss a project.",
+                    "description": "Send a 'website request' email to our team. Call this when the user wants to contact us, ask a question, or discuss a project.",
                     "parameters": {
                         "type": "object",
                         "properties": {

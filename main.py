@@ -12,13 +12,14 @@ from collections import defaultdict
 from dotenv import load_dotenv  # type: ignore
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File  # type: ignore
 from fastapi.staticfiles import StaticFiles  # type: ignore
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse  # type: ignore
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, HTMLResponse  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from fastapi.exceptions import RequestValidationError  # type: ignore
 from pydantic import BaseModel  # type: ignore
 
 # Local imports
 import db_utils
+import brand
 from chatbot import PinnacleChatbot, LLM_ERRORS, _GROQ_MODELS
 from gemini_image_client import GeminiImageClient
 from voice_agent import VoiceAgent
@@ -175,7 +176,10 @@ static_generated_path.mkdir(exist_ok=True)
 
 @app.api_route("/", methods=["GET", "HEAD"])
 async def read_index():
-    return FileResponse(str(static_path / "index.html"))
+    if not brand.IS_MIAMI:
+        return FileResponse(str(static_path / "index.html"))
+    html = (static_path / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse(brand.brand_page(html))
 
 
 @app.api_route("/health", methods=["GET", "HEAD"])
