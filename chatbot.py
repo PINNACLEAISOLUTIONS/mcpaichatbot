@@ -90,7 +90,7 @@ def _record_llm_error(model_name: str, error: str) -> None:
 class PinnacleChatbot:
     """AI Chatbot powered by LiteLLM (supports Gemini, Ollama, OpenAI, etc.) with MCP integration"""
 
-    def __init__(self, session_id: Optional[str] = None):
+    def __init__(self, session_id: Optional[str] = None, brand_name: Optional[str] = None):
         """
         Initialize the chatbot with an MCP manager and session ID.
         """
@@ -137,18 +137,11 @@ class PinnacleChatbot:
             "city": None,  # e.g., "Jacksonville", "Gainesville"
             "state": None,  # e.g., "Florida", "FL"
         }
-        # Default home region for Pinnacle AI
-        self.default_region = "Global"
-        # ========== END LOCAL BUSINESS CONTEXT ==========
-
-        # ========== PROFESSIONAL HARDENING (ADDITIVE) ==========
-        # Image rate limiting - 15 second cooldown per session
-        self._last_image_request: float = 0.0
-        self._image_cooldown_seconds: int = 15
-        # Lead capture staleness tracking
-        self._lead_last_activity: float = 0.0
-        self._lead_stale_seconds: int = 300  # 5 minutes
-        # ========== END PROFESSIONAL HARDENING ==========
+        # Resolve Brand dynamically
+        self.brand = brand.resolve_brand(brand_name)
+        self.is_miami = self.brand == "miami"
+        self.phone = "(786) 570-3215" if self.is_miami else "(904) 686-6593"
+        self.default_region = "Miami, Florida" if self.is_miami else "Global"
 
         # Session management
         self.sessions_dir = Path("sessions")
@@ -159,26 +152,7 @@ class PinnacleChatbot:
         self.conversation_history = self.load_history(self.session_id)
         self.context_summary = ""  # Holds summarized history
 
-        self.system_instruction = (
-            "You are Pinnacle AI Expert, the lead consultant for Pinnacle AI Solutions. "
-            "Your mission is to provide cutting-edge, professional AI and development advice. "
-            "### OUR CORE PILLARS:\n"
-            "1. **Website Development**: We build high-performance, responsive web applications.\n"
-            "2. **AI Chatbot Integrations**: We specialize in custom RAG systems and LiteLLM orchestration.\n"
-            "3. **AI Agents**: We design autonomous workflows and complex multi-agent systems.\n"
-            "4. **Scrapers & Data Extraction**: We create high-scale, stealthy scrapers.\n\n"
-            "### CONTACT INFORMATION:\n"
-            "- **Email**: futureai4all@gmail.com\n"
-            "- **Phone**: 352-231-9154\n\n"
-            "### YOUR BEHAVIOR:\n"
-            "- **Ask Questions**: When a user mentions a need, ask clarifying questions to provide expert ideas.\n"
-            "- **Be Direct**: When a user wants to contact us or start a project, get their **Name**, **Email**, and **Brief Needs**, then call the 'send_lead_email' tool immediately. Do NOT use a step-by-step questionnaire.\n"
-            "- **For General Knowledge**: If a user asks a basic fact or general question (e.g., 'What is the capital of England?'), just answer it directly. Do NOT try to connect it back to Pinnacle AI or force a sales pitch.\n"
-            "- **Professionalism**: Use clear, concise, and technically accurate language."
-        )
-        if brand.IS_MIAMI:
-            self.system_instruction = brand.MIAMI_SYSTEM_INSTRUCTION
-            self.default_region = "Miami, Florida"
+        self.system_instruction = brand.get_system_instruction(self.brand)
 
         # Session management
 
@@ -201,7 +175,7 @@ class PinnacleChatbot:
 
     def _load_business_knowledge(self) -> str:
         """Load business_knowledge.md content into memory."""
-        kb_path = Path("miami_knowledge.md" if brand.IS_MIAMI else "business_knowledge.md")
+        kb_path = Path("miami_knowledge.md" if getattr(self, 'is_miami', False) else "business_knowledge.md")
         if kb_path.exists():
             try:
                 return kb_path.read_text(encoding="utf-8")
@@ -232,14 +206,7 @@ class PinnacleChatbot:
     async def _request_quote_permission(self) -> str:
         """Ask for permission to collect info and email the Pinnacle AI Team."""
         self.lead_state["awaiting_permission"] = True
-        if brand.IS_MIAMI:
-            return brand.MIAMI_LEAD_PERMISSION
-        return (
-            "I'd be happy to help you get started with a professional inquiry! \n\n"
-            "**Please allow me to notify the Pinnacle AI Solutions expert team with your project vision**, "
-            "and I'll collect some brief details to ensure we connect you with the right specialist.\n\n"
-            "May I proceed with collecting your details? (Just say 'yes' or 'sure' to continue)"
-        )
+        return brand.get_lead_permission(getattr(self, 'brand', 'pinnacle'))
 
     async def _start_lead_capture(self) -> str:
         """Start the lead capture flow after permission granted."""
@@ -267,7 +234,17 @@ class PinnacleChatbot:
             logger.info("Smart filter: Skipping KB for math question")
             return None
         # ========== END SMART FILTER ==========
-        if brand.IS_MIAMI:  # small single-business KB: always give it to the model
+        if getattr(self, 'is_miami', False):
+            return self.knowledge_base or None
+        
+        # For Pinnacle AI, inject knowledge base whenever user asks about services, scrapers, agents, phone receptionists, pricing, or company capabilities
+        pinnacle_keywords = [
+            "service", "services", "what do you", "what can you", "help with",
+            "pinnacle", "phone", "receptionist", "call", "voice", "agent", "agents",
+            "scraper", "scraping", "poster", "posting", "website", "bot", "chatbot",
+            "contact", "email", "pricing", "quote", "cost", "audit", "lead", "leads"
+        ]
+        if any(kw in msg_lower for kw in pinnacle_keywords):
             return self.knowledge_base or None
 
         # ----- ORIGINAL LOGIC BELOW (UNCHANGED) -----
@@ -495,9 +472,11 @@ class PinnacleChatbot:
             # Check if we can get title and history together
             conn = sqlite3.connect(db_utils.DB_PATH)
             cursor = conn.cursor()
+            brand_prefix = getattr(self, 'brand', 'pinnacle')
+            db_session_id = f"{brand_prefix}_{session_id}" if not session_id.startswith(brand_prefix + "_") else session_id
             cursor.execute(
                 "SELECT title, history FROM sessions WHERE session_id = ?",
-                (session_id,),
+                (db_session_id,),
             )
             row = cursor.fetchone()
             conn.close()
@@ -515,8 +494,10 @@ class PinnacleChatbot:
         if not self.session_id:
             return
         try:
+            brand_prefix = getattr(self, 'brand', 'pinnacle')
+            db_session_id = f"{brand_prefix}_{self.session_id}" if not self.session_id.startswith(brand_prefix + "_") else self.session_id
             db_utils.save_session_history(
-                self.session_id, self.conversation_history, self.session_title
+                db_session_id, self.conversation_history, self.session_title
             )
             # ========== CONVERSATION LOGGING (ADDITIVE) ==========
             # Log conversation to local file for later review (non-blocking)
@@ -536,7 +517,7 @@ class PinnacleChatbot:
         self.conversation_history.append(
             {
                 "role": "assistant",
-                "content": brand.MIAMI_GREETING if brand.IS_MIAMI else "Hello! I'm Pinnacle AI Expert. I'm here to help you with cutting-edge AI solutions, website development, and automation. How can I assist your business today?",
+                "content": brand.get_greeting(getattr(self, 'brand', 'pinnacle')),
             }
         )
 
@@ -565,7 +546,7 @@ class PinnacleChatbot:
             {"role": "system", "content": self.system_instruction},
             {
                 "role": "assistant",
-                "content": brand.MIAMI_GREETING if brand.IS_MIAMI else "Hello! I'm Pinnacle AI Expert. I can help you design AI agents, build high-performance websites, or create custom scrapers. What project are you working on?",
+                "content": brand.get_greeting(getattr(self, 'brand', 'pinnacle')),
             },
         ]
         logger.info("Chat session reset.")
@@ -1664,22 +1645,24 @@ class PinnacleChatbot:
             # Use the robust email_utils function (synchronous, so maybe wrap or just call)
             # Since email_utils.send_lead_email is blocking SMTP, we should run it in executor if possible,
             # but for now direct call is fine or use loop.run_in_executor
-            success = await asyncio.to_thread(email_utils.send_lead_email, lead_data)
+            brand_name = getattr(self, 'brand', 'pinnacle')
+            phone_num = getattr(self, 'phone', '(904) 686-6593')
+            success = await asyncio.to_thread(email_utils.send_lead_email, lead_data, brand_name)
 
             if success:
                 logger.info(
-                    f"Lead email sent via email_utils for session {self.session_id}"
+                    f"Lead email sent via email_utils for session {self.session_id} (brand: {brand_name})"
                 )
                 res = "### ✅ Request Sent Successfully!\n\n"
                 res += "Our expert team has been notified. We will review your vision and get back to you within 24 hours.\n\n"
-                res += "**For urgent inquiries, call us directly at 352-231-9154.**"
+                res += f"**For immediate inquiries, call us directly at {phone_num}.**"
                 return res
             else:
                 res = "### ⚠️ System Note\n\n"
                 res += "I've saved your details to our database, but the automated email system is currently busy.\n\n"
                 res += "Our team reviews these daily, or you can use this direct link to send a quick backup email:\n"
                 res += f"[Send Direct Email Now]({email_utils.generate_mailto_link(lead_data)})\n\n"
-                res += "**Or call us at 352-231-9154.**"
+                res += f"**Or call us directly at {phone_num}.**"
                 return res
         except Exception as e:
             logger.error(f"Failed to send lead email wrapper: {e}")

@@ -1,13 +1,21 @@
-
 // Helper to determine API Base URL
 function getApiBaseUrl() {
     const hn = window.location.hostname;
-    // If running locally or on local network (localhost, 127.0.0.1, 192.168.x.x, 10.x.x.x), use local backend
     if (hn === 'localhost' || hn === '127.0.0.1' || hn.startsWith('192.168.') || hn.startsWith('10.') || hn.startsWith('172.')) {
-        return `http://${hn}:8001`; // Use local backend dynamically
+        return `http://${hn}:8001`;
     }
-    // Otherwise talk to the server that served this page. This code runs on several
-    // Render services (Pinnacle, Miami); a hardcoded URL sent every site's chats to
-    // one service and its keys.
     return window.location.origin;
+}
+
+// Helper to determine Active Brand from URL or Body class
+function getActiveBrand() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const qb = urlParams.get('brand');
+    if (qb) {
+        const lower = qb.toLowerCase();
+        if (lower.includes('miami') || lower.includes('green') || lower.includes('landscap')) return 'miami';
+        return 'pinnacle';
+    }
+    if (document.body && document.body.classList.contains('brand-miami')) return 'miami';
+    return 'pinnacle';
 }

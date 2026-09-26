@@ -844,3 +844,114 @@ textarea {
         max-width: 100vw;
     }
 }
+
+/* --- Capability Chips & Quick Action Prompts --- */
+.capability-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0 6px;
+    padding: 0 2px;
+}
+
+.chip-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+
+.chip-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+body.brand-pinnacle .chip-btn {
+    background: rgba(15, 23, 42, 0.75);
+    border-color: rgba(0, 243, 255, 0.25);
+    color: #e0f2fe;
+}
+
+body.brand-pinnacle .chip-btn:hover {
+    border-color: #00F3FF;
+    color: #00F3FF;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.35);
+}
+
+body.brand-miami .chip-btn {
+    background: rgba(18, 48, 18, 0.75);
+    border-color: rgba(76, 175, 80, 0.35);
+    color: #e8f5e9;
+}
+
+body.brand-miami .chip-btn:hover {
+    border-color: #FFA726;
+    color: #FFA726;
+    box-shadow: 0 0 15px rgba(255, 167, 38, 0.35);
+}
+
+/* --- Interactive Voice Visualizer Overlay --- */
+.voice-visualizer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    margin: 8px auto;
+    width: 90%;
+    max-width: 440px;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    user-select: none;
+}
+
+.voice-visualizer .v-bars {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 30px;
+}
+
+.voice-visualizer .v-bar {
+    width: 4px;
+    height: 8px;
+    border-radius: 3px;
+    transition: height 0.15s ease;
+    animation: vBarPulse 1s ease-in-out infinite alternate;
+}
+
+.voice-visualizer .v-bar:nth-child(1) { animation-delay: 0.0s; }
+.voice-visualizer .v-bar:nth-child(2) { animation-delay: 0.2s; }
+.voice-visualizer .v-bar:nth-child(3) { animation-delay: 0.4s; }
+.voice-visualizer .v-bar:nth-child(4) { animation-delay: 0.1s; }
+.voice-visualizer .v-bar:nth-child(5) { animation-delay: 0.3s; }
+
+@keyframes vBarPulse {
+    0% { height: 6px; }
+    100% { height: 26px; }
+}
+
+.voice-visualizer-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.voice-visualizer:hover {
+    filter: brightness(1.15);
+    transform: scale(1.02);
+}

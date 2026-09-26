@@ -104,6 +104,7 @@ RATE_LIMIT_SESSION_TOTAL = 50  # Max total messages per session (resets on new s
 class ChatMessage(BaseModel):
     message: str
     session_id: Optional[str] = None
+    brand: Optional[str] = None
 
 
 class ToolCallRequest(BaseModel):
@@ -122,6 +123,7 @@ class ImageGenerateRequest(BaseModel):
 class TTSRequest(BaseModel):
     text: str
     voice: Optional[str] = None
+    brand: Optional[str] = None
 
 
 @app.on_event("startup")
@@ -151,19 +153,21 @@ async def shutdown_event():
         await gemini_image_client.stop()
 
 
-def get_chatbot(session_id: str) -> PinnacleChatbot:
-    """Get or create a chatbot for the given session."""
-    if session_id in active_chatbots:
-        return active_chatbots[session_id]
+def get_chatbot(session_id: str, brand_name: Optional[str] = None) -> PinnacleChatbot:
+    """Get or create a chatbot for the given session and brand with strict isolation."""
+    resolved_brand = brand.resolve_brand(brand_name)
+    cache_key = f"{resolved_brand}_{session_id}"
+    if cache_key in active_chatbots:
+        return active_chatbots[cache_key]
 
     public_base_url = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
 
-    bot = PinnacleChatbot(session_id=session_id)
+    bot = PinnacleChatbot(session_id=session_id, brand_name=resolved_brand)
     bot.gemini_image_client = gemini_image_client
     bot.public_base_url = public_base_url
 
-    active_chatbots[session_id] = bot
-    logger.info(f"Created/Loaded chatbot for session {session_id}")
+    active_chatbots[cache_key] = bot
+    logger.info(f"Created/Loaded chatbot for brand '{resolved_brand}', session '{session_id}'")
     return bot
 
 
@@ -175,11 +179,11 @@ static_generated_path.mkdir(exist_ok=True)
 
 
 @app.api_route("/", methods=["GET", "HEAD"])
-async def read_index():
-    if not brand.IS_MIAMI:
-        return FileResponse(str(static_path / "index.html"))
+async def read_index(request: Request):
+    brand_param = request.query_params.get("brand")
+    resolved = brand.resolve_brand(brand_param)
     html = (static_path / "index.html").read_text(encoding="utf-8")
-    return HTMLResponse(brand.brand_page(html))
+    return HTMLResponse(brand.brand_page(html, resolved))
 
 
 @app.api_route("/health", methods=["GET", "HEAD"])
@@ -393,7 +397,7 @@ async def text_to_speech(request: TTSRequest):
         raise HTTPException(status_code=503, detail="Voice agent offline")
     try:
         result = await voice_agent.text_to_speech(
-            text=request.text, voice=request.voice, return_base64=True
+            text=request.text, voice=request.voice, brand_name=request.brand, return_base64=True
         )
         return result
     except Exception as e:

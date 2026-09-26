@@ -1,0 +1,272 @@
+/* ===================================================================
+   PINNACLE AI SOLUTIONS - CYBER FUTURISTIC DARK THEME
+   Tailored to match pinnacleaisolutions.site
+   =================================================================== */
+
+body.brand-pinnacle {
+    --bg-dark: #070a13;
+    --sidebar-bg: rgba(10, 16, 30, 0.92);
+    --accent: #00F3FF;
+    --accent-glow: rgba(0, 243, 255, 0.45);
+    --accent-secondary: #a855f7;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --glass-bg: rgba(15, 23, 42, 0.65);
+    --glass-border: rgba(0, 243, 255, 0.18);
+    --user-msg: linear-gradient(135deg, rgba(30, 27, 75, 0.92), rgba(15, 23, 42, 0.95));
+    --bot-msg: rgba(13, 20, 36, 0.82);
+    --success: #00ff9d;
+    --error: #ff4466;
+    background:
+        radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0, 243, 255, 0.12), transparent 70%),
+        radial-gradient(ellipse 60% 40% at 90% 90%, rgba(168, 85, 247, 0.10), transparent 60%),
+        radial-gradient(ellipse 50% 50% at 0% 50%, rgba(0, 122, 255, 0.08), transparent 50%),
+        #070a13;
+    color: var(--text-primary);
+}
+
+/* Header */
+body.brand-pinnacle .chat-header {
+    background: rgba(10, 16, 30, 0.88);
+    border-bottom: 1px solid rgba(0, 243, 255, 0.22);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+body.brand-pinnacle .header-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+body.brand-pinnacle .header-icon-badge {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, rgba(0, 243, 255, 0.2), rgba(168, 85, 247, 0.2));
+    border: 1px solid rgba(0, 243, 255, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    box-shadow: 0 0 12px rgba(0, 243, 255, 0.3);
+}
+
+body.brand-pinnacle .header-text {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: linear-gradient(135deg, #00f3ff 0%, #38bdf8 50%, #c084fc 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Brand Banner */
+body.brand-pinnacle .brand-banner {
+    background: linear-gradient(90deg, rgba(0, 243, 255, 0.08), rgba(168, 85, 247, 0.08)) !important;
+    border-bottom: 1px solid rgba(0, 243, 255, 0.18) !important;
+    padding: 10px 16px !important;
+    text-align: center;
+}
+
+body.brand-pinnacle .brand-banner h2 {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: clamp(0.9rem, 2.8vw, 1.25rem) !important;
+    font-weight: 800 !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    background: linear-gradient(135deg, #00F3FF 0%, #38bdf8 45%, #a855f7 100%) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+}
+
+body.brand-pinnacle .brand-tags {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+body.brand-pinnacle .brand-tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: rgba(0, 243, 255, 0.08);
+    border: 1px solid rgba(0, 243, 255, 0.2);
+    color: #7dd3fc;
+}
+
+/* Chat Messages */
+body.brand-pinnacle .assistant-message {
+    background: var(--bot-msg);
+    border: 1px solid rgba(0, 243, 255, 0.18);
+    border-left: 3px solid #00F3FF;
+    border-radius: 14px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+body.brand-pinnacle .assistant-message.first {
+    border-left-color: #a855f7;
+    box-shadow: 0 0 24px rgba(0, 243, 255, 0.15), 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+body.brand-pinnacle .user-message {
+    background: var(--user-msg);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    border-radius: 14px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 15px rgba(168, 85, 247, 0.1);
+}
+
+body.brand-pinnacle .message-content a {
+    color: #00F3FF;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+body.brand-pinnacle .message-content a:hover {
+    color: #38bdf8;
+    text-shadow: 0 0 8px rgba(0, 243, 255, 0.6);
+    text-decoration: underline;
+}
+
+body.brand-pinnacle .message-content strong {
+    color: #e0f2fe;
+}
+
+/* Code & Pre inside messages */
+body.brand-pinnacle pre {
+    background: #030712 !important;
+    border: 1px solid rgba(0, 243, 255, 0.25) !important;
+    border-radius: 8px;
+}
+
+/* Input Area */
+body.brand-pinnacle .input-container {
+    background: rgba(10, 16, 30, 0.92);
+    border: 1px solid rgba(0, 243, 255, 0.22);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    transition: all 0.3s ease;
+}
+
+body.brand-pinnacle .input-container:focus-within {
+    border-color: #00F3FF;
+    box-shadow: 0 0 20px rgba(0, 243, 255, 0.35), 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+body.brand-pinnacle #user-input {
+    color: #f8fafc;
+}
+
+body.brand-pinnacle #user-input::placeholder {
+    color: #64748b;
+}
+
+/* Buttons */
+body.brand-pinnacle .send-button {
+    background: linear-gradient(135deg, #00F3FF 0%, #007AFF 100%);
+    color: #030712;
+    border-radius: 12px;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+    transition: all 0.25s ease;
+}
+
+body.brand-pinnacle .send-button:hover:not(:disabled) {
+    background: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%);
+    box-shadow: 0 0 22px rgba(0, 243, 255, 0.6);
+    transform: scale(1.05);
+}
+
+body.brand-pinnacle .mic-button {
+    color: #94a3b8;
+    transition: all 0.2s ease;
+}
+
+body.brand-pinnacle .mic-button:hover {
+    color: #00F3FF;
+}
+
+body.brand-pinnacle .mic-button.recording {
+    color: #ff4466;
+    animation: micPulseCyber 1.2s infinite;
+}
+
+@keyframes micPulseCyber {
+    0%, 100% { filter: drop-shadow(0 0 4px rgba(255, 68, 102, 0.5)); transform: scale(1); }
+    50% { filter: drop-shadow(0 0 14px rgba(255, 68, 102, 0.9)); transform: scale(1.15); }
+}
+
+/* Voice Mode Button */
+body.brand-pinnacle .voice-mode-button {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(0, 243, 255, 0.25);
+    color: #cbd5e1;
+    border-radius: 20px;
+    transition: all 0.3s ease;
+}
+
+body.brand-pinnacle .voice-mode-button:hover {
+    border-color: #00F3FF;
+    color: #00F3FF;
+    box-shadow: 0 0 12px rgba(0, 243, 255, 0.25);
+}
+
+body.brand-pinnacle .voice-mode-button.active {
+    background: linear-gradient(135deg, rgba(0, 243, 255, 0.15), rgba(168, 85, 247, 0.15));
+    border-color: #00F3FF;
+    color: #00F3FF;
+    box-shadow: 0 0 18px rgba(0, 243, 255, 0.45);
+}
+
+/* Voice Visualizer */
+body.brand-pinnacle .voice-visualizer {
+    background: rgba(10, 16, 30, 0.9);
+    border: 1px solid rgba(0, 243, 255, 0.3);
+    border-radius: 14px;
+    box-shadow: 0 0 20px rgba(0, 243, 255, 0.25);
+    cursor: pointer;
+}
+
+body.brand-pinnacle .voice-visualizer .v-bar {
+    background: linear-gradient(180deg, #00F3FF, #a855f7);
+    box-shadow: 0 0 8px rgba(0, 243, 255, 0.6);
+}
+
+/* Quick Action / HD Toggle */
+body.brand-pinnacle .quick-action-btn {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(0, 243, 255, 0.2);
+    color: #cbd5e1;
+}
+
+body.brand-pinnacle .quick-action-btn:hover {
+    border-color: #00F3FF;
+    color: #00F3FF;
+}
+
+body.brand-pinnacle #hd-toggle-btn.hd-active {
+    background: linear-gradient(135deg, rgba(0, 243, 255, 0.2), rgba(0, 122, 255, 0.2));
+    border-color: #00F3FF;
+    color: #00F3FF;
+}
+
+/* Scrollbars */
+body.brand-pinnacle ::-webkit-scrollbar-thumb {
+    background: rgba(0, 243, 255, 0.25);
+    border-radius: 4px;
+}
+
+body.brand-pinnacle ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 243, 255, 0.45);
+}

@@ -6,14 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pinnacle AI Expert - Chatbot</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/brand-pinnacle.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Inter:wght@400;500&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
-<body>
+<body class="brand-pinnacle">
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
@@ -27,7 +28,7 @@
             <div class="sidebar-content">
                 <div class="quick-actions">
                     <button id="new-chat-btn" class="quick-action-btn"
-                        style="background: var(--accent); color: white; width: 100%; justify-content: center;">
+                        style="background: var(--accent); color: #030712; width: 100%; justify-content: center; font-weight: 600;">
                         ✨ New Chat
                     </button>
                     <!-- HD Toggle (Groq Whisper vs Browser STT) -->
@@ -52,6 +53,7 @@
         <main class="main-chat">
             <header class="chat-header">
                 <div class="header-title">
+                    <span class="header-icon-badge">🤖</span>
                     <span class="header-text">Pinnacle AI Expert Chat</span>
                 </div>
                 <div class="header-controls" style="display: flex; align-items: center; gap: 10px;">
@@ -75,43 +77,37 @@
             </header>
 
             <!-- Brand Banner -->
-            <div class="brand-banner" style="
-                text-align: center;
-                padding: 12px 20px;
-                background: linear-gradient(135deg, rgba(0, 243, 255, 0.05), rgba(0, 122, 255, 0.05));
-                border-bottom: 1px solid rgba(0, 243, 255, 0.1);
-            ">
-                <h2 style="
-                    margin: 0;
-                    font-family: 'Outfit', sans-serif;
-                    font-size: clamp(1rem, 3vw, 1.4rem);
-                    font-weight: 700;
-                    text-transform: uppercase;
-                    letter-spacing: 2px;
-                    background: linear-gradient(135deg, #00F3FF 0%, #007AFF 100%);
-                    -webkit-background-clip: text;
-                    background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                ">PINNACLE AI SOLUTIONS</h2>
+            <div class="brand-banner">
+                <h2>PINNACLE AI SOLUTIONS</h2>
+                <div class="brand-tags">
+                    <span class="brand-tag">🤖 AI Agents</span>
+                    <span class="brand-tag">📞 Phone Receptionists</span>
+                    <span class="brand-tag">🕷️ Lead Scrapers</span>
+                    <span class="brand-tag">🚀 Auto-Posters</span>
+                </div>
             </div>
 
             <div id="chat-messages" class="chat-messages">
                 <div class="message assistant-message first">
                     <div class="message-content">
-                        <strong>🚀 Pinnacle AI Expert Systems</strong><br><br>
-                        Welcome! I'm here to help you architect <strong>Elite AI Agents</strong>,
-                        <strong>Stealthy Scrapers</strong>, and <strong>Scalable Web Applications</strong>.<br><br>
-                        <em>Ready to transform your business with AI? Let's discuss your project!</em>
+                        <strong>🚀 Pinnacle AI Solutions - Expert Systems</strong><br><br>
+                        Welcome! I'm here to help you architect <strong>AI Phone Receptionists</strong>,
+                        <strong>Autonomous AI Agents</strong>, <strong>Stealth Lead Scrapers</strong>,
+                        <strong>Auto-Posters</strong>, and <strong>High-Performance Web Platforms</strong>.<br><br>
+                        <em>Call us directly at <a href="tel:+19046866593">(904) 686-6593</a> or let's discuss your project!</em>
                     </div>
                 </div>
             </div>
 
-            <div id="voice-visualizer" class="voice-visualizer hidden">
-                <div class="v-bar"></div>
-                <div class="v-bar"></div>
-                <div class="v-bar"></div>
-                <div class="v-bar"></div>
-                <div class="v-bar"></div>
+            <div id="voice-visualizer" class="voice-visualizer hidden" title="Tap to interrupt">
+                <div class="v-bars">
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                    <div class="v-bar"></div>
+                </div>
+                <div class="voice-visualizer-label" id="voice-visualizer-label">Listening... (Tap to stop)</div>
             </div>
 
             <div class="input-area">
@@ -142,7 +138,7 @@
     <div class="bg-blur blur-2"></div>
 
     <script src="/static/config.js"></script>
-    <script src="/static/chat.js?v=2.1.0"></script>
+    <script src="/static/chat.js?v=3.0.0"></script>
 </body>
 
 </html>
