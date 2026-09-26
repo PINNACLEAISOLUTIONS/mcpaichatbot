@@ -23,6 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let isSpeaking = false;
     let currentSpeakingMsgId = null;
     let voiceModeActive = false;
+    let speechGen = 0;        // bumped by stopSpeaking(); stale TTS responses are dropped
+    let spokenText = '';      // what the bot is saying, to tell echo from a real interruption
+    let resultOffset = 0;     // recognition results before this index were echo / already used
     const systemAudio = new Audio();
 
     // Unlock Audio for Mobile Safari on first interaction
@@ -79,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isRecording = true;
             micBtn.classList.add('recording');
             if (voiceVisualizer) voiceVisualizer.classList.remove('hidden');
-            stopSpeaking(); // Barge-in
+            resultOffset = 0;
         };
 
         recognition.onend = () => {
@@ -131,14 +134,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let silenceTimer = null;
         recognition.onresult = (event) => {
-            // BARGE-IN: Stop speaking immediately if any speech is detected
-            if (isSpeaking) {
-                console.log("Barge-in detected (speech started)");
-                stopSpeaking();
-            }
-
             let fullTranscript = '';
-            for (let i = 0; i < event.results.length; ++i) {
+            for (let i = resultOffset; i < event.results.length; ++i) {
                 let chunk = event.results[i][0].transcript;
                 if (!chunk.trim()) continue;
 
@@ -153,6 +150,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Standard chunk appending (Desktop Chrome)
                     fullTranscript += chunk;
                 }
+            }
+            // BARGE-IN: the mic stays open while the bot talks. Our own voice leaking
+            // from the speakers is ignored; real new words stop the bot mid-sentence.
+            if (isSpeaking) {
+                if (!isInterruption(fullTranscript)) {
+                    resultOffset = event.results.length; // treat as echo, drop it
+                    return;
+                }
+                console.log("Barge-in detected:", fullTranscript);
+                stopSpeaking();
             }
             if (fullTranscript) {
                 userInput.value = fullTranscript;
@@ -175,12 +182,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let mediaRecorder = null;
     let audioChunks = [];
 
-    async function startListening() {
+    // A transcript counts as an interruption (not echo) when it has at least 2 words
+    // and at least half of them are not in what the bot is currently saying.
+    function isInterruption(transcript) {
+        const words = transcript.toLowerCase().match(/[a-z']+/g) || [];
+        if (words.length < 2) return false;
+        const said = new Set(spokenText.toLowerCase().match(/[a-z']+/g) || []);
+        return words.filter(w => !said.has(w)).length / words.length >= 0.5;
+    }
+
+    async function startListening(keepSpeaking = false) {
         if (isRecording) {
             console.log("Already recording, skipping startListening");
             return;
         }
-        stopSpeaking();
+        if (!keepSpeaking) stopSpeaking();
         console.log("Starting listening session...");
         if (useHDMode) {
             try {
@@ -256,19 +272,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- TTS Logic (Premium with Fallback) ---
     async function speakWithElevenLabs(text, msgId) {
         if (!elevenLabsAvailable) { speakTextBrowser(text, msgId); return; }
+        stopSpeaking();
+        const gen = speechGen;
         try {
             const response = await fetch(`${API_BASE}/api/tts`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: text })
             });
+            if (gen !== speechGen) return; // stopped/interrupted while audio was loading
             if (!response.ok) { speakTextBrowser(text, msgId); return; }
             const data = await response.json();
+            if (gen !== speechGen) return;
             if (data.success && data.audio_base64) {
-                stopSpeaking();
                 const audioBlob = base64ToBlob(data.audio_base64, data.content_type || 'audio/mpeg');
                 systemAudio.src = URL.createObjectURL(audioBlob);
                 isSpeaking = true;
+                spokenText = text;
                 currentSpeakingMsgId = msgId;
                 updateSpeakButton(msgId, true);
                 systemAudio.onended = () => {
@@ -277,8 +297,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (voiceModeActive && !isRecording) startListening();
                 };
                 await systemAudio.play();
+                openMicForBargeIn();
             } else { speakTextBrowser(text, msgId); }
-        } catch (err) { speakTextBrowser(text, msgId); }
+        } catch (err) { if (gen === speechGen) speakTextBrowser(text, msgId); }
     }
 
     function speakTextBrowser(text, msgId) {
@@ -286,7 +307,12 @@ document.addEventListener('DOMContentLoaded', () => {
         window.speechSynthesis.cancel();
         const cleanText = text.replace(/[#*_`~]/g, '').replace(/\[.*?\]\(.*?\)/g, '');
         const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.onstart = () => { isSpeaking = true; currentSpeakingMsgId = msgId; updateSpeakButton(msgId, true); };
+        const maleVoice = pickMaleBrowserVoice();
+        if (maleVoice) utterance.voice = maleVoice;
+        utterance.onstart = () => {
+            isSpeaking = true; spokenText = cleanText; currentSpeakingMsgId = msgId; updateSpeakButton(msgId, true);
+            openMicForBargeIn();
+        };
         utterance.onend = () => {
             isSpeaking = false; updateSpeakButton(msgId, false);
             if (voiceModeActive && !isRecording) startListening();
@@ -299,7 +325,24 @@ document.addEventListener('DOMContentLoaded', () => {
         window.speechSynthesis.speak(utterance);
     }
 
+    // Fallback voice when premium TTS is unavailable: prefer a natural male voice.
+    function pickMaleBrowserVoice() {
+        const voices = window.speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+        const prefs = ['Andrew Online', 'Brian Online', 'Christopher Online', 'Guy Online', 'Google UK English Male',
+            'Daniel', 'Alex', 'Aaron', 'Microsoft David', 'Microsoft Mark', 'Male'];
+        for (const p of prefs) { const v = voices.find(v => v.name.includes(p)); if (v) return v; }
+        return null;
+    }
+
+    // In voice mode, listen while the bot talks so the user can cut in by speaking.
+    // HD mode records raw audio (it would capture the bot's own voice), so it keeps
+    // tap-the-mic-to-interrupt instead.
+    function openMicForBargeIn() {
+        if (voiceModeActive && !useHDMode && recognition && !isRecording) startListening(true);
+    }
+
     function stopSpeaking() {
+        speechGen++;
         if (systemAudio && !systemAudio.paused) { systemAudio.pause(); systemAudio.currentTime = 0; }
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         isSpeaking = false;
@@ -323,7 +366,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Event Handlers ---
-    if (micBtn) micBtn.addEventListener('click', () => { if (isRecording) stopListening(); else startListening(); });
+    if (micBtn) micBtn.addEventListener('click', () => {
+        if (isSpeaking) { stopSpeaking(); if (!isRecording) startListening(); return; } // tap to interrupt
+        if (isRecording) stopListening(); else startListening();
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && isSpeaking) stopSpeaking(); });
     if (hdToggleBtn) hdToggleBtn.addEventListener('click', () => {
         useHDMode = !useHDMode; hdToggleBtn.textContent = useHDMode ? 'HD' : 'STD';
         hdToggleBtn.classList.toggle('hd-active', useHDMode);
@@ -381,6 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function sendMessage() {
         const text = userInput.value.trim();
         if (!text || sendBtn.disabled) return;
+        stopSpeaking();
         addUserMessage(text);
         userInput.value = '';
         userInput.style.height = 'auto';
@@ -491,8 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
             actionsDiv.style.display = '';
             div.querySelector('.speak-btn').addEventListener('click', () => {
                 if (isSpeaking && currentSpeakingMsgId === msgId) stopSpeaking();
-                else if (voiceModeActive) speakWithElevenLabs(displayText, msgId);
-                else speakTextBrowser(displayText, msgId);
+                else speakWithElevenLabs(displayText, msgId);
             });
             scrollToBottom();
 
@@ -535,8 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         div.querySelector('.speak-btn').addEventListener('click', () => {
             if (isSpeaking && currentSpeakingMsgId === msgId) stopSpeaking();
-            else if (voiceModeActive) speakWithElevenLabs(text, msgId);
-            else speakTextBrowser(text, msgId);
+            else speakWithElevenLabs(text, msgId);
         });
 
         chatMessages.appendChild(div);

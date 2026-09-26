@@ -29,10 +29,21 @@ class VoiceAgent:
     """Text-to-Speech agent with ElevenLabs primary, Edge TTS secondary, and Google fallback."""
 
     # ElevenLabs voice IDs (free tier compatible)
+    # "miami" is the default name the widget uses. The old custom voice
+    # (s3TPKV1kjDlVtZbl4Ksh) and "josh" no longer exist on the account and silently
+    # fell back to Edge TTS; default is now Brian (natural, deep American male).
+    # Set ELEVENLABS_VOICE_ID on Render to override without a code change.
     VOICES = {
-        "miami": "s3TPKV1kjDlVtZbl4Ksh",  # Custom Pinnacle AI Expert voice
+        "miami": "nPczCjzI2devNBz1zQrb",  # Brian
+        "brian": "nPczCjzI2devNBz1zQrb",
+        "daniel": "onwK4e9ZLuTAKqWW03F9",  # British, authoritative
+        "chris": "iP95p4xoKVk53GoZ742B",  # Casual American
+        "eric": "cjVigY5qzO86Huf0OWal",  # Smooth, friendly
+        "roger": "CwhRBWXzGAHq8TQ4Fs17",  # Confident
+        "liam": "TX3LPaxmHKxFdv7VOQHJ",  # Young, energetic
+        "will": "bIHbv24MWmeRgasZH58o",  # Relaxed
         "rachel": "21m00Tcm4TlvDq8ikWAM",  # Warm, professional female
-        "josh": "TxGEqnHWrfWFTfGW9XjX",  # Friendly male
+        "josh": "nPczCjzI2devNBz1zQrb",  # retired voice, mapped to Brian
         "bella": "EXAVITQu4vr4xnSDxMaL",  # Young female
         "adam": "pNInz6obpgDQGcFmaJgB",  # Deep male
         "antoni": "ErXwobaYiN019PkySvjV",  # Antoni (Deep, well rounded)
@@ -70,10 +81,9 @@ class VoiceAgent:
                     logger.info(
                         f"🎤 Custom ElevenLabs Voice ID detected: {self.custom_voice_id}"
                     )
-                    # Allow 'custom' as a voice name
+                    # Allow 'custom' as a voice name, and use it as the default voice
                     self.VOICES["custom"] = self.custom_voice_id
-                    # Also override the requested voice if it's the default
-                    self.VOICES["josh"] = self.custom_voice_id
+                    self.VOICES["miami"] = self.custom_voice_id
             else:
                 self.client = None
                 logger.warning("⚠️ ElevenLabs API key found but SDK not installed!")
@@ -228,7 +238,7 @@ class VoiceAgent:
                 audio_stream = self.client.text_to_speech.convert(
                     text=text,
                     voice_id=voice_id,
-                    model_id="eleven_multilingual_v2",
+                    model_id="eleven_flash_v2_5",
                     output_format="mp3_44100_128",
                 )
 
@@ -239,14 +249,14 @@ class VoiceAgent:
 
             except Exception as e:
                 logger.warning(
-                    f"ElevenLabs Multilingual V2 failed ({e}), falling back to Monolingual V1"
+                    f"ElevenLabs Flash v2.5 failed ({e}), falling back to Multilingual v2"
                 )
                 # Fallback to standard model
                 # Do NOT await the generator creation
                 audio_stream = self.client.text_to_speech.convert(
                     text=text,
                     voice_id=voice_id,
-                    model_id="eleven_monolingual_v1",
+                    model_id="eleven_multilingual_v2",
                     output_format="mp3_44100_128",
                 )
 

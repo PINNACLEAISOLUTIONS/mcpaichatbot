@@ -409,7 +409,7 @@ async def elevenlabs_tts_premium(request: Dict[str, str]):
     try:
         client = ElevenLabs(api_key=api_key)
         audio = client.text_to_speech.convert(
-            voice_id=os.getenv("ELEVENLABS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb"),
+            voice_id=os.getenv("ELEVENLABS_VOICE_ID", "nPczCjzI2devNBz1zQrb"),
             text=text,
             model_id="eleven_multilingual_v2",
         )
