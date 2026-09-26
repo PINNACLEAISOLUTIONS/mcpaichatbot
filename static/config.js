@@ -1,4 +1,3 @@
-const BACKEND_URL = "https://miamilovesgreenlandscaping.onrender.com"; // Updated to your live URL
 
 // Helper to determine API Base URL
 function getApiBaseUrl() {
@@ -7,6 +6,8 @@ function getApiBaseUrl() {
     if (hn === 'localhost' || hn === '127.0.0.1' || hn.startsWith('192.168.') || hn.startsWith('10.') || hn.startsWith('172.')) {
         return `http://${hn}:8001`; // Use local backend dynamically
     }
-    // Otherwise use the production Render URL
-    return BACKEND_URL;
+    // Otherwise talk to the server that served this page. This code runs on several
+    // Render services (Pinnacle, Miami); a hardcoded URL sent every site's chats to
+    // one service and its keys.
+    return window.location.origin;
 }
