@@ -19,17 +19,14 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log(`Active Chatbot Brand: ${activeBrand}`);
 
     // --- State Management ---
-    let useHDMode = false; // HD = Groq Whisper, STD = Browser Web Speech
+    let useHDMode = false;
     let autoSpeak = false;
     let isSpeaking = false;
     let isRecording = false;
     let voiceModeActive = false;
     let currentSpeakingMsgId = null;
     let speechGen = 0;          // Bumped on stopSpeaking(); drops late TTS audio
-    let spokenText = '';        // Current bot utterance for echo rejection
-    let speechStartTime = 0;    // Timestamp when speech started (barge-in grace period)
     let silenceTimer = null;
-    let mediaStreamTrack = null; // For hardware echo cancellation
     const systemAudio = new Audio();
 
     // Isolated Session Storage Key per Brand
@@ -51,12 +48,15 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', setVH);
     setVH();
 
-    // Unlock Audio for Mobile Safari on first touch
+    // Synchronously unlock Audio for Mobile / Safari on user interaction
     function unlockAudio() {
-        if (!systemAudio.src) {
-            systemAudio.src = 'data:audio/mp3;base64,//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
-            systemAudio.play().catch(() => { });
-        }
+        try {
+            systemAudio.play().then(() => {
+                systemAudio.pause();
+                systemAudio.currentTime = 0;
+            }).catch(() => { });
+        } catch (e) { }
+
         if ('speechSynthesis' in window) {
             const u = new SpeechSynthesisUtterance('');
             u.volume = 0;
@@ -65,23 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.removeEventListener('click', unlockAudio);
         document.body.removeEventListener('touchstart', unlockAudio);
     }
-    document.body.addEventListener('click', unlockAudio);
-    document.body.addEventListener('touchstart', unlockAudio);
-
-    // --- Hardware Echo Cancellation Setup ---
-    async function requestHardwareEchoCancellation() {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && !mediaStreamTrack) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-                });
-                mediaStreamTrack = stream.getAudioTracks()[0];
-                console.log("Hardware Acoustic Echo Cancellation (AEC) active.");
-            } catch (e) {
-                console.log("AEC note:", e);
-            }
-        }
-    }
+    document.body.addEventListener('click', unlockAudio, { once: true });
+    document.body.addEventListener('touchstart', unlockAudio, { once: true });
 
     // --- Interactive Capability Chips ---
     function renderCapabilityChips() {
@@ -128,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
             chipsContainer.appendChild(btn);
         });
 
-        // Insert below the first assistant message
         const firstMsg = chatMessages.querySelector('.assistant-message.first');
         if (firstMsg) {
             firstMsg.appendChild(chipsContainer);
@@ -141,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Visualizer Status Helper ---
     function updateVisualizerState(state, label) {
         if (!voiceVisualizer) return;
-        if (!voiceModeActive) {
+        if (!voiceModeActive && !isRecording && !isSpeaking) {
             voiceVisualizer.classList.add('hidden');
             return;
         }
@@ -155,12 +139,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Web Speech API (STD Mode) ---
+    // --- Web Speech Recognition (STD Mode) ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = null;
 
     if (!SpeechRecognition) {
-        console.log("SpeechRecognition not supported in browser, forcing HD Mode.");
+        console.log("SpeechRecognition not supported in browser, using HD Mode.");
         useHDMode = true;
         if (hdToggleBtn) {
             hdToggleBtn.textContent = 'HD';
@@ -177,58 +161,52 @@ document.addEventListener('DOMContentLoaded', () => {
         recognition.onstart = () => {
             isRecording = true;
             micBtn.classList.add('recording');
-            if (voiceModeActive) {
-                if (isSpeaking) {
-                    updateVisualizerState('speaking', '<span>🔊 Speaking...</span> <small style="opacity:0.8;">(Tap or say "Stop" to interrupt)</small>');
-                } else {
-                    updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.8;">(Speak now)</small>');
-                }
+            if (voiceModeActive && !isSpeaking) {
+                updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.85;">(Speak now)</small>');
             }
         };
 
         recognition.onend = () => {
-            if (isRecording && !useHDMode) {
-                // If silence caused onend and we have captured text, send it
-                if (userInput.value.trim() && voiceModeActive && !isSpeaking) {
-                    isRecording = false;
-                    micBtn.classList.remove('recording');
-                    sendMessage();
-                    return;
-                }
-                // Restart recognition to keep session continuous
+            isRecording = false;
+            micBtn.classList.remove('recording');
+
+            // If user finished speaking and text is present, auto-send
+            if (userInput.value.trim() && voiceModeActive && !isSpeaking) {
+                sendMessage();
+                return;
+            }
+
+            // In Voice Mode, keep the listening loop active while bot is NOT speaking
+            if (voiceModeActive && !isSpeaking) {
                 setTimeout(() => {
-                    try {
-                        if (isRecording || (voiceModeActive && !isSpeaking)) {
-                            recognition.start();
-                        }
-                    } catch (e) {
-                        isRecording = false;
-                        micBtn.classList.remove('recording');
+                    if (voiceModeActive && !isSpeaking && !isRecording) {
+                        safeStartRecognition();
                     }
                 }, 200);
-            } else if (!isRecording) {
-                micBtn.classList.remove('recording');
             }
         };
 
         recognition.onerror = (event) => {
-            console.warn("Speech recognition error:", event.error);
+            console.log("Speech recognition event:", event.error);
+            if (event.error === 'no-speech') {
+                return; // Normal pause; let onend handle clean loop
+            }
             if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
                 isRecording = false;
                 micBtn.classList.remove('recording');
                 voiceModeActive = false;
                 if (voiceModeBtn) voiceModeBtn.classList.remove('active');
                 updateVisualizerState('hidden', '');
+                alert("Please enable microphone permissions in your browser to talk.");
             }
         };
 
-        // Words that immediately trigger an instant barge-in interruption
-        const STOP_KEYWORDS = new Set([
-            'stop', 'wait', 'hold', 'pause', 'cancel', 'quiet', 'shh', 'listen',
-            'shut up', 'hush', 'hold up', 'excuse me', 'no', 'hey'
-        ]);
-
         recognition.onresult = (event) => {
+            // STRICT MUTE: Ignore all mic input while the bot is speaking (prevents blurry echo / self-interruption)
+            if (isSpeaking) {
+                return;
+            }
+
             let transcript = '';
             for (let i = 0; i < event.results.length; ++i) {
                 transcript += event.results[i][0].transcript;
@@ -236,62 +214,50 @@ document.addEventListener('DOMContentLoaded', () => {
             const cleanTranscript = transcript.trim();
             if (!cleanTranscript) return;
 
-            // --- BARGE-IN INTERRUPTION HANDLING ---
-            if (isSpeaking) {
-                const now = Date.now();
-                // 350ms grace period so audio startup doesn't falsely trip
-                if (now - speechStartTime > 350) {
-                    const words = cleanTranscript.toLowerCase().split(/\s+/);
-                    const hasStopWord = words.some(w => STOP_KEYWORDS.has(w.replace(/[.,!?]/g, '')));
-
-                    // Check if user is asking a substantial new question
-                    const botWords = new Set(spokenText.toLowerCase().split(/\s+/));
-                    const newWords = words.filter(w => !botWords.has(w));
-
-                    if (hasStopWord || newWords.length >= 2) {
-                        console.log("⚡ Voice Barge-In Interruption Detected:", cleanTranscript);
-                        stopSpeaking();
-                        userInput.value = hasStopWord ? '' : cleanTranscript;
-                        updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.8;">(Speak now)</small>');
-                        return;
-                    }
-                }
-                return; // Ignore echo while speaking
-            }
-
-            // Normal transcription while user speaks
+            // Clear, live transcription feedback for the user
             userInput.value = cleanTranscript;
             userInput.dispatchEvent(new Event('input'));
-            updateVisualizerState('listening', '<span>🎙️ ' + cleanTranscript.slice(-35) + '</span>');
+            updateVisualizerState('listening', '<span>🎙️ ' + cleanTranscript.slice(-32) + '</span>');
 
-            // Silence timer: auto-send after 1.6s of silence
+            // Auto-send after 1.3s of silence once user finishes speaking
             clearTimeout(silenceTimer);
             silenceTimer = setTimeout(() => {
                 if (userInput.value.trim() && (voiceModeActive || isRecording) && !isSpeaking) {
                     stopListening();
                     setTimeout(() => {
                         if (userInput.value.trim()) sendMessage();
-                    }, 200);
+                    }, 120);
                 }
-            }, 1600);
+            }, 1300);
         };
+    }
+
+    function safeStartRecognition() {
+        if (!recognition || isSpeaking) return;
+        try {
+            recognition.start();
+            isRecording = true;
+            micBtn.classList.add('recording');
+        } catch (e) {
+            if (e.name !== 'InvalidStateError') {
+                console.warn("Recognition start note:", e);
+            }
+        }
     }
 
     // --- MediaRecorder (HD Mode) ---
     let mediaRecorder = null;
     let audioChunks = [];
 
-    async function startListening(keepSpeaking = false) {
+    async function startListening() {
+        if (isSpeaking) {
+            stopSpeaking();
+        }
         if (isRecording) return;
-        if (!keepSpeaking) stopSpeaking();
-
-        await requestHardwareEchoCancellation();
 
         if (useHDMode) {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
                 audioChunks = [];
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
@@ -321,28 +287,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 isRecording = false;
             }
         } else if (recognition) {
-            try {
-                recognition.start();
-            } catch (e) {
-                if (e.name !== 'InvalidStateError') {
-                    console.warn("Recognition start note:", e);
-                    isRecording = false;
-                }
-            }
+            safeStartRecognition();
         }
     }
 
     function stopListening() {
         isRecording = false;
         if (useHDMode && mediaRecorder && mediaRecorder.state === 'recording') {
-            mediaRecorder.stop();
+            try { mediaRecorder.stop(); } catch (e) { }
         } else if (recognition) {
             try { recognition.stop(); } catch (e) { }
         }
         micBtn.classList.remove('recording');
     }
 
-    // --- Stop Speaking (Immediate Cutoff) ---
+    // --- Stop Speaking (Immediate Cutoff & Barge-In) ---
     function stopSpeaking() {
         speechGen++;
         if (systemAudio && !systemAudio.paused) {
@@ -353,29 +312,62 @@ document.addEventListener('DOMContentLoaded', () => {
             window.speechSynthesis.cancel();
         }
         isSpeaking = false;
-        spokenText = '';
         if (currentSpeakingMsgId) updateSpeakButton(currentSpeakingMsgId, false);
         currentSpeakingMsgId = null;
     }
 
-    // --- Best Voice Determination ---
-    // Pinnacle: Antoni (ElevenLabs) / AndrewNeural (Edge)
-    // Miami: Eric (ElevenLabs) / AndrewNeural (Edge)
     function getPreferredVoice() {
-        // Returns activeBrand to let backend select flagship ElevenLabs male voice (Adam)
-        // or environment variable overrides (ELEVENLABS_VOICE_ID_PINNACLE / ELEVENLABS_VOICE_ID_MIAMI)
         return activeBrand;
+    }
+
+    // Clean text into natural conversational spoken English
+    function extractSpeechText(rawText) {
+        let clean = rawText
+            .replace(/```[\s\S]*?```/g, '')
+            .replace(/`([^`]+)`/g, '$1')
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+            .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+            .replace(/https?:\/\/\S+/g, '')
+            .replace(/^#+\s*/gm, '')
+            .replace(/^\s*[-*+]\s+/gm, '')
+            .replace(/[*_~]{1,3}([^*_~]+)[*_~]{1,3}/g, '$1')
+            .replace(/\((\d{3})\)\s*(\d{3})-(\d{4})/g, '$1, $2, $3')
+            .replace(/(\d{3})-(\d{3})-(\d{4})/g, '$1, $2, $3')
+            .replace(/\n+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        // In voice mode, keep conversational audio snappy (first 2-3 sentences, max 350 chars)
+        // so it responds in sub-second time and speaks clearly without droning on
+        if (voiceModeActive && clean.length > 360) {
+            const sentences = clean.match(/[^.!?]+[.!?]+/g);
+            if (sentences && sentences.length > 0) {
+                let snippet = '';
+                for (const s of sentences) {
+                    if ((snippet + s).length > 330) break;
+                    snippet += s + ' ';
+                }
+                if (snippet.trim().length > 30) {
+                    return snippet.trim();
+                }
+            }
+            return clean.substring(0, 330).trim() + '...';
+        }
+        return clean;
     }
 
     // --- High-Quality TTS (ElevenLabs -> Edge TTS -> Browser Fallback) ---
     async function speakWithElevenLabs(text, msgId) {
         stopSpeaking();
+        // Crucial: STOP mic while speaking so the speaker NEVER bleeds into the mic
+        stopListening();
+
         const gen = ++speechGen;
-        speechStartTime = Date.now();
-        spokenText = text.replace(/[#*_`~]/g, '').replace(/\[.*?\]\(.*?\)/g, '');
+        const spoken = extractSpeechText(text);
+        if (!spoken) return;
 
         if (voiceModeActive) {
-            updateVisualizerState('speaking', '<span>🔊 Speaking...</span> <small style="opacity:0.8;">(Tap or say "Stop" to interrupt)</small>');
+            updateVisualizerState('speaking', '<span>🔊 Speaking...</span> <small style="opacity:0.85;">(Tap to interrupt)</small>');
         }
 
         try {
@@ -384,7 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    text: spokenText,
+                    text: spoken,
                     voice: voiceTarget,
                     brand: activeBrand
                 })
@@ -405,69 +397,65 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     systemAudio.onended = () => {
                         isSpeaking = false;
-                        spokenText = '';
+                        userInput.value = '';
                         if (msgId) updateSpeakButton(msgId, false);
-                        // Natural conversational loop: open mic for next turn
+
+                        // Seamless turn-taking loop: automatically open mic after speech finishes
                         if (voiceModeActive) {
+                            updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.85;">(Speak now)</small>');
                             setTimeout(() => {
                                 if (voiceModeActive && !isSpeaking && !isRecording) {
                                     startListening();
                                 }
-                            }, 180);
+                            }, 200);
                         }
                     };
 
                     await systemAudio.play();
-                    // Keep mic open for barge-in if in voice mode
-                    if (voiceModeActive && !useHDMode && recognition && !isRecording) {
-                        try { recognition.start(); } catch (e) { }
-                    }
                     return;
                 }
             }
             // Fallback to browser speech if API fails
-            speakTextBrowser(spokenText, msgId);
+            speakTextBrowser(spoken, msgId);
         } catch (err) {
-            if (gen === speechGen) speakTextBrowser(spokenText, msgId);
+            if (gen === speechGen) speakTextBrowser(spoken, msgId);
         }
     }
 
     function speakTextBrowser(cleanText, msgId) {
         if (!('speechSynthesis' in window)) return;
         window.speechSynthesis.cancel();
+        stopListening();
+
         const utterance = new SpeechSynthesisUtterance(cleanText);
         const maleVoice = pickMaleBrowserVoice();
         if (maleVoice) utterance.voice = maleVoice;
 
         utterance.onstart = () => {
             isSpeaking = true;
-            speechStartTime = Date.now();
             currentSpeakingMsgId = msgId;
             if (msgId) updateSpeakButton(msgId, true);
             if (voiceModeActive) {
-                updateVisualizerState('speaking', '<span>🔊 Speaking...</span> <small style="opacity:0.8;">(Tap or say "Stop" to interrupt)</small>');
-                if (!useHDMode && recognition && !isRecording) {
-                    try { recognition.start(); } catch (e) { }
-                }
+                updateVisualizerState('speaking', '<span>🔊 Speaking...</span> <small style="opacity:0.85;">(Tap to interrupt)</small>');
             }
         };
 
         utterance.onend = () => {
             isSpeaking = false;
-            spokenText = '';
+            userInput.value = '';
             if (msgId) updateSpeakButton(msgId, false);
             if (voiceModeActive) {
+                updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.85;">(Speak now)</small>');
                 setTimeout(() => {
                     if (voiceModeActive && !isSpeaking && !isRecording) {
                         startListening();
                     }
-                }, 180);
+                }, 200);
             }
         };
 
         utterance.onerror = () => {
             isSpeaking = false;
-            spokenText = '';
             if (msgId) updateSpeakButton(msgId, false);
             if (voiceModeActive && !isRecording) startListening();
         };
@@ -505,16 +493,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return new Blob([arr], { type: mimeType });
     }
 
-    // --- Click & Touch Interruption ---
+    // --- Tap/Click Interruption (Barge-In) ---
     if (voiceVisualizer) {
         voiceVisualizer.addEventListener('click', (e) => {
             e.preventDefault();
             if (isSpeaking) {
                 console.log("Tap on Visualizer interrupted speech.");
                 stopSpeaking();
+                userInput.value = '';
                 startListening();
             } else if (isRecording) {
                 stopListening();
+                if (userInput.value.trim()) sendMessage();
             } else {
                 startListening();
             }
@@ -524,19 +514,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (micBtn) {
         micBtn.addEventListener('click', (e) => {
             e.preventDefault();
+            unlockAudio();
             if (isSpeaking) {
                 stopSpeaking();
+                userInput.value = '';
                 startListening();
                 return;
             }
-            if (isRecording) stopListening();
-            else startListening();
+            if (isRecording) {
+                stopListening();
+                if (userInput.value.trim()) sendMessage();
+            } else {
+                startListening();
+            }
         });
     }
 
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape' && isSpeaking) {
             stopSpeaking();
+            userInput.value = '';
             if (voiceModeActive) startListening();
         }
     });
@@ -555,10 +552,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Voice Mode Toggle ---
+    // --- Voice Mode Toggle (Clear & Easy: Does NOT talk over user!) ---
     if (voiceModeBtn) {
-        voiceModeBtn.addEventListener('click', async (e) => {
+        voiceModeBtn.addEventListener('click', (e) => {
             e.preventDefault();
+            unlockAudio();
+
             voiceModeActive = !voiceModeActive;
             voiceModeBtn.classList.toggle('active', voiceModeActive);
             autoSpeak = voiceModeActive;
@@ -567,13 +566,14 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Voice Mode: ${voiceModeActive ? 'ENABLED' : 'DISABLED'}`);
 
             if (voiceModeActive) {
+                // Instantly open the mic cleanly so the user can speak immediately!
                 stopSpeaking();
                 stopListening();
-                await requestHardwareEchoCancellation();
-                const greeting = (activeBrand === 'miami')
-                    ? "Welcome to Miami Loves Green. Voice mode active. How can I help with your yard?"
-                    : "Welcome to Pinnacle AI. Voice mode active. I'm listening.";
-                speakWithElevenLabs(greeting, null);
+                userInput.value = '';
+                updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.85;">(Speak now)</small>');
+                setTimeout(() => {
+                    startListening();
+                }, 150);
             } else {
                 stopSpeaking();
                 stopListening();
@@ -616,6 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!text || sendBtn.disabled) return;
 
         stopSpeaking();
+        stopListening();
         clearTimeout(silenceTimer);
         addUserMessage(text);
         userInput.value = '';
@@ -718,7 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             scrollToBottom();
 
-            // Auto-speak in voice mode
+            // Auto-speak in voice mode (clean, natural, concise ElevenLabs voice)
             if (autoSpeak) {
                 speakWithElevenLabs(displayText, msgId);
             }
@@ -727,7 +728,8 @@ document.addEventListener('DOMContentLoaded', () => {
             loader.remove();
             addErrorMessage("Connection error. Please try again.");
             if (voiceModeActive) {
-                updateVisualizerState('listening', '<span>🎙️ Listening...</span>');
+                updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.85;">(Speak now)</small>');
+                startListening();
             }
         }
         sendBtn.disabled = false;
