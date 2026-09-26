@@ -1275,6 +1275,28 @@ class PinnacleChatbot:
             error_msg = f"I encountered an error: {str(e)}"
             yield f"data: {_json.dumps({'type': 'error', 'content': error_msg})}\n\n"
 
+    def _model_chain(self):
+        """Model fallback order shared by streaming and non-streaming paths.
+        Groq first to save Gemini quota; each Gemini model has its own free-tier
+        quota, so more distinct models = more capacity. Verified live 2026-09-26
+        (gemini-2.0-* and 1.5-* are retired by Google and return 404)."""
+        chain = []
+        if self.groq_api_key:
+            chain += ["groq/llama-3.3-70b-versatile", "groq/llama-3.1-8b-instant"]
+        if self.gemini_api_key:
+            chain += [
+                "gemini/gemini-2.5-flash",
+                "gemini/gemini-2.5-flash-lite",
+                "gemini/gemini-3.5-flash-lite",
+                "gemini/gemini-3.1-flash-lite",
+                "gemini/gemini-flash-lite-latest",
+            ]
+        if not chain:
+            logger.warning("No API keys found! Chatbot will not work.")
+            chain = ["groq/llama-3.3-70b-versatile"]  # Will fail but gives clear error
+        logger.info(f"Model fallback chain: {chain}")
+        return chain
+
     async def _get_completion_stream(self, messages=None):
         """
         Streaming version of _get_completion. Yields text chunks.
@@ -1285,23 +1307,13 @@ class PinnacleChatbot:
         else:
             messages = messages.copy()
 
-        # Build fallback chain (same as _get_completion)
-        fallback_chain = []
-        if self.groq_api_key:
-            fallback_chain.append("groq/llama-3.3-70b-versatile")
-            fallback_chain.append("groq/llama-3.1-8b-instant")
-        if self.gemini_api_key:
-            fallback_chain.append("gemini/gemini-2.5-flash")
-            fallback_chain.append("gemini/gemini-2.5-pro")
-            fallback_chain.append("gemini/gemini-2.0-flash")
-            fallback_chain.append("gemini/gemini-2.0-flash-lite")
-        if not fallback_chain:
-            fallback_chain = ["groq/llama-3.3-70b-versatile"]
+        unique_chain = self._model_chain()
 
-        seen = set()
-        unique_chain = [x for x in fallback_chain if not (x in seen or seen.add(x))]
-
-        for model_name in unique_chain:
+        # Free-tier limits are per-minute: if every model is rate limited,
+        # wait briefly and walk the chain once more before giving up.
+        for attempt, model_name in [(a, m) for a in range(2) for m in unique_chain]:
+            if attempt and model_name == unique_chain[0]:
+                await asyncio.sleep(4)
             try:
                 completion_kwargs = {
                     "model": model_name,
@@ -1350,8 +1362,6 @@ class PinnacleChatbot:
         """
         # Define the fallback chain with VERIFIED WORKING models only
         # Last tested: 2024-12-26
-        fallback_chain = []
-
         # Prepare messages
         if messages is None:
             messages = self.conversation_history.copy()
@@ -1374,35 +1384,7 @@ class PinnacleChatbot:
             messages = [m for m in messages if m.get("role") != "system"]
             messages.insert(0, {"role": "system", "content": combined_content})
 
-        # 1. Groq models FIRST to preserve Gemini free tier quota
-        if self.groq_api_key:
-            fallback_chain.append(
-                "groq/llama-3.3-70b-versatile"
-            )  # Best quality, verified
-            fallback_chain.append(
-                "groq/llama-3.1-8b-instant"
-            )  # Fast fallback, verified
-
-        # 2. Gemini models as fallback - using latest 2026 free-tier models
-        if self.gemini_api_key:
-            fallback_chain.append("gemini/gemini-2.5-flash")
-            fallback_chain.append("gemini/gemini-2.5-pro")
-            fallback_chain.append("gemini/gemini-2.0-flash")
-            fallback_chain.append("gemini/gemini-2.0-flash-lite")
-            fallback_chain.append("gemini/gemini-1.5-pro")
-
-        # 3. Absolute final fallback
-        if not fallback_chain:
-            logger.warning("No API keys found! Chatbot will not work.")
-            fallback_chain = [
-                "groq/llama-3.3-70b-versatile"
-            ]  # Will fail but gives clear error
-
-        # Deduplicate while preserving order
-        seen = set()
-        unique_chain = [x for x in fallback_chain if not (x in seen or seen.add(x))]
-
-        logger.info(f"Model fallback chain: {unique_chain}")
+        unique_chain = self._model_chain()
 
         errors_encountered = []
         max_retries_per_model = 3
