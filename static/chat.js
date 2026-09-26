@@ -78,13 +78,48 @@ document.addEventListener('DOMContentLoaded', () => {
         chipsContainer.className = 'capability-chips';
 
         const pinnacleChips = [
-            { label: '📞 AI Phone Receptionist', prompt: 'How does an AI phone receptionist work for my business?' },
-            { label: '🤖 Autonomous AI Agents', prompt: 'What kind of autonomous AI workflows and agents can you build?' },
-            { label: '🕷️ Stealth Lead Scrapers', prompt: 'Tell me about your Google Maps, Craigslist, and directory scrapers.' },
-            { label: '🚀 Auto-Posters', prompt: 'How do your automated social and marketplace auto-posters work?' },
-            { label: '🌐 Web Apps & Chatbots', prompt: 'Can you build a high-performance web app with an integrated AI chatbot?' },
-            { label: '🎨 Generate AI Concept', prompt: 'Generate a futuristic 3D cyberpunk concept image for an AI agency' },
-            { label: '📞 Call (904) 686-6593', prompt: 'I want to schedule a consultation with Pinnacle AI Solutions.' }
+            {
+                icon: '📞',
+                title: '24/7 AI Phone Receptionist',
+                desc: 'Zero missed calls, live calendar booking & CRM sync',
+                prompt: 'How does an AI phone receptionist work for my business, and how does it book appointments and sync to CRM?'
+            },
+            {
+                icon: '🤖',
+                title: 'Autonomous AI Agents',
+                desc: 'Multi-agent workflows, Zapier & n8n automation',
+                prompt: 'What kind of custom autonomous AI agents and multi-agent workflows can you build for business operations?'
+            },
+            {
+                icon: '🕷️',
+                title: 'Custom Lead Scrapers',
+                desc: 'Google Maps, social groups & directory extraction',
+                prompt: 'Tell me about your custom lead scrapers for Google Maps, Craigslist, and public Facebook groups.'
+            },
+            {
+                icon: '🚀',
+                title: 'Auto-Posters & Marketing',
+                desc: 'Scheduled social posting & AI video generation',
+                prompt: 'How do your automated social media auto-posters and marketing workflows keep businesses visible?'
+            },
+            {
+                icon: '🌐',
+                title: 'Custom Web Platforms',
+                desc: 'Next.js web apps with integrated 24/7 AI chat',
+                prompt: 'Can you build a high-performance custom website or landing page with an integrated AI chatbot and instant lead SMS?'
+            },
+            {
+                icon: '🎓',
+                title: '1-on-1 Virtual Training',
+                desc: 'Personalized AI coaching & free consultation',
+                prompt: 'I want to learn about your 1-on-1 virtual training program and schedule a free AI consultation.'
+            },
+            {
+                icon: '📞',
+                title: 'Direct Line: (904) 686-6593',
+                desc: 'Speak directly with an AI systems consultant',
+                prompt: 'I would like to speak directly with an AI systems consultant at (904) 686-6593.'
+            }
         ];
 
         const miamiChips = [
@@ -103,8 +138,20 @@ document.addEventListener('DOMContentLoaded', () => {
         chips.forEach(item => {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'chip-btn';
-            btn.innerHTML = item.label;
+            if (item.title) {
+                btn.className = 'chip-card';
+                btn.innerHTML = `
+                    <div class="chip-card-icon">${item.icon}</div>
+                    <div class="chip-card-body">
+                        <span class="chip-card-title">${item.title}</span>
+                        <span class="chip-card-desc">${item.desc}</span>
+                    </div>
+                    <div class="chip-card-arrow">→</div>
+                `;
+            } else {
+                btn.className = 'chip-btn';
+                btn.innerHTML = item.label;
+            }
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 userInput.value = item.prompt;
@@ -482,6 +529,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
     }
 
+    function getCopyIcon() {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+    }
+
     function getSpeakingIcon() {
         return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
     }
@@ -673,7 +724,8 @@ document.addEventListener('DOMContentLoaded', () => {
             div.innerHTML = `
                 <div class="message-content"></div>
                 <div class="message-actions" style="display:none;">
-                    <button class="action-btn speak-btn" title="Speak">${getSpeakerIcon()}</button>
+                    <button class="action-btn copy-btn" title="Copy response">${getCopyIcon()} <span>Copy</span></button>
+                    <button class="action-btn speak-btn" title="Listen with voice">${getSpeakerIcon()} <span>Listen</span></button>
                 </div>
             `;
             chatMessages.appendChild(div);
@@ -717,6 +769,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (isSpeaking && currentSpeakingMsgId === msgId) stopSpeaking();
                 else speakWithElevenLabs(displayText, msgId);
             });
+            const streamCopyBtn = div.querySelector('.copy-btn');
+            if (streamCopyBtn) {
+                streamCopyBtn.addEventListener('click', () => {
+                    navigator.clipboard.writeText(displayText).then(() => {
+                        streamCopyBtn.innerHTML = `✓ <span>Copied!</span>`;
+                        setTimeout(() => {
+                            streamCopyBtn.innerHTML = `${getCopyIcon()} <span>Copy</span>`;
+                        }, 2000);
+                    }).catch(() => {});
+                });
+            }
             scrollToBottom();
 
             // Auto-speak in voice mode (clean, natural, concise ElevenLabs voice)
@@ -744,10 +807,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function addAssistantMessage(text) {
+        const msgId = 'msg_' + Date.now();
         const div = document.createElement('div');
         div.className = 'message assistant-message';
-        div.innerHTML = `<div class="message-content">${marked.parse(text)}</div>`;
+        div.setAttribute('data-msg-id', msgId);
+        div.innerHTML = `
+            <div class="message-content">${marked.parse(text)}</div>
+            <div class="message-actions">
+                <button class="action-btn copy-btn" title="Copy response">${getCopyIcon()} <span>Copy</span></button>
+                <button class="action-btn speak-btn" title="Listen with voice">${getSpeakerIcon()} <span>Listen</span></button>
+            </div>
+        `;
         chatMessages.appendChild(div);
+        div.querySelector('.speak-btn').addEventListener('click', () => {
+            if (isSpeaking && currentSpeakingMsgId === msgId) stopSpeaking();
+            else speakWithElevenLabs(text, msgId);
+        });
+        const copyBtn = div.querySelector('.copy-btn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+                navigator.clipboard.writeText(text).then(() => {
+                    copyBtn.innerHTML = `✓ <span>Copied!</span>`;
+                    setTimeout(() => {
+                        copyBtn.innerHTML = `${getCopyIcon()} <span>Copy</span>`;
+                    }, 2000);
+                }).catch(() => {});
+            });
+        }
         scrollToBottom();
     }
 
