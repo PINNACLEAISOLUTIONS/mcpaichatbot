@@ -8,6 +8,7 @@ Default is Pinnacle AI Solutions.
 """
 
 import os
+import re
 from typing import Optional
 
 ENV_BRAND = os.getenv("BOT_BRAND", "pinnacle").strip().lower()
@@ -156,6 +157,11 @@ def brand_page(html: str, brand_name: Optional[str] = None) -> str:
     """Apply brand page swaps to index.html for the given brand."""
     resolved = resolve_brand(brand_name)
     if resolved == "miami":
+        # 1. Ensure brand-miami.css is loaded regardless of query param on brand-pinnacle.css
+        html = re.sub(r'/static/brand-pinnacle\.css[^"\'>]*', '/static/brand-miami.css?v=1.4.2', html)
+        # 2. Apply all standard string swaps
         for old, new in MIAMI_PAGE_SWAPS:
             html = html.replace(old, new)
+        # 3. Double guarantee: Remove the bulky .brand-banner completely for Miami
+        html = re.sub(r'<div class="brand-banner">[\s\S]*?</div>\s*</div>', '', html)
     return html
