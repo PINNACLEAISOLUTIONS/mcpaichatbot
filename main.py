@@ -198,7 +198,14 @@ async def read_index(request: Request):
     brand_param = request.query_params.get("brand")
     resolved = brand.resolve_brand(brand_param)
     html = (static_path / "index.html").read_text(encoding="utf-8")
-    return HTMLResponse(brand.brand_page(html, resolved))
+    return HTMLResponse(
+        brand.brand_page(html, resolved),
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @app.api_route("/health", methods=["GET", "HEAD"])
