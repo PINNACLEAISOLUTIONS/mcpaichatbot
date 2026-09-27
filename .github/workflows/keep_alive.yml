@@ -1,0 +1,19 @@
+name: Keep Chatbots Awake
+
+on:
+  schedule:
+    # Run every 10 minutes to prevent Render free-tier cold starts
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Pinnacle AI Chatbot
+        run: |
+          curl -s -f --max-time 20 https://mcpaichatbot-1.onrender.com/health || echo "Pinnacle ping returned error or cold-started"
+
+      - name: Ping Miami Loves Green Landscaping Chatbot
+        run: |
+          curl -s -f --max-time 20 https://miamilovesgreenlandscaping.onrender.com/health || echo "Miami ping returned error or cold-started"

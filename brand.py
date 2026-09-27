@@ -132,6 +132,8 @@ MIAMI_PAGE_SWAPS = [
     ('<body class="brand-pinnacle">', '<body class="brand-miami">'),
     ('<img class="header-icon-badge" src="/static/pinnacle-logo.png" alt="Pinnacle AI">',
      '<img class="header-icon-badge" src="/static/logo-tropical.png" alt="Miami Loves Green">'),
+    ('<span class="header-text">Pinnacle AI Expert Chat</span>',
+     '<span class="header-text">Miami Loves Green Assistant</span>'),
     ("<h2>PINNACLE AI SOLUTIONS</h2>",
      "<h2>MIAMI LOVES GREEN LANDSCAPING</h2>"),
     ('<span class="brand-tag">🤖 AI Agents</span>',

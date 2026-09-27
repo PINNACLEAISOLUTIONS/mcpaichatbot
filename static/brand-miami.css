@@ -43,8 +43,11 @@ body.brand-miami .header-text {
 
 /* Banner: inline styles on the page, so these need !important */
 body.brand-miami .brand-banner {
-    background: linear-gradient(90deg, rgba(76, 175, 80, 0.14), rgba(255, 167, 38, 0.10)) !important;
-    border-bottom: 1px solid rgba(255, 167, 38, 0.25) !important;
+    display: none !important;
+}
+
+body.brand-miami .brand-tags {
+    display: none !important;
 }
 
 body.brand-miami .brand-banner h2 {

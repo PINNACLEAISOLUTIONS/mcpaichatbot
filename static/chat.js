@@ -318,11 +318,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn("Recognition start note:", e);
             }
         }
-    } catch (e) {
-            if (e.name !== 'InvalidStateError') {
-                console.warn("Recognition start note:", e);
-            }
-        }
     }
 
     // --- MediaRecorder (HD Mode) ---
