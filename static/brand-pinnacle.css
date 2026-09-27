@@ -89,27 +89,10 @@ body.brand-pinnacle .header-text {
     line-height: 1.2;
 }
 
+/* Live Neural Core badge removed per user request */
 body.brand-pinnacle .header-title::after {
-    content: "● LIVE • NEURAL CORE";
-    font-size: 0.64rem;
-    font-weight: 700;
-    letter-spacing: 0.8px;
-    padding: 2px 7px;
-    border-radius: 10px;
-    background: rgba(0, 255, 157, 0.12);
-    border: 1px solid rgba(0, 255, 157, 0.35);
-    color: #00ff9d;
-    text-shadow: 0 0 8px rgba(0, 255, 157, 0.6);
-    box-shadow: 0 0 8px rgba(0, 255, 157, 0.15);
-    margin-left: 6px;
-    display: inline-flex;
-    align-items: center;
-}
-
-@media (max-width: 540px) {
-    body.brand-pinnacle .header-title::after {
-        display: none;
-    }
+    display: none !important;
+    content: none !important;
 }
 
 /* ===================================================================

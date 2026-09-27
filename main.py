@@ -35,7 +35,7 @@ load_dotenv(override=True)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-APP_VERSION = "1.4.3"
+APP_VERSION = "1.4.4"
 
 app = FastAPI(title="Pinnacle AI Expert Chatbot")
 
@@ -55,6 +55,7 @@ async def add_iframe_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Frame-Options"] = "ALLOWALL"
     response.headers["Content-Security-Policy"] = "frame-ancestors *"
+    response.headers["Permissions-Policy"] = "microphone=*, autoplay=*"
     return response
 
 

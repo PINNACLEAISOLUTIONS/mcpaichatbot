@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSpeakingMsgId = null;
     let speechGen = 0;          // Bumped on stopSpeaking(); drops late TTS audio
     let silenceTimer = null;
+    let pendingSendFromVoice = false;
     const systemAudio = new Audio();
 
     // Isolated Session Storage Key per Brand
@@ -186,14 +187,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    
-    // --- Clean Spoken Transcript (Eliminates Browser Speech Stutter, Duplicates, and Overlaps) ---
+    // --- Clean Spoken Transcript ---
     function cleanSpokenTranscript(text) {
         if (!text) return '';
         let s = text.replace(/\s+/g, ' ').trim();
         // Collapse repeated phrases (1 to 5 words repeated consecutively)
         s = s.replace(/\b((?:[a-zA-Z0-9']+\s+){1,5}[a-zA-Z0-9']+)\s+\1\b/gi, '$1');
-        // Collapse single repeated words (e.g. "what what" -> "what", "is is" -> "is", "the the" -> "the", "us us" -> "us")
+        // Collapse single repeated words
         s = s.replace(/\b([a-zA-Z0-9']+)\s+\1\b/gi, '$1');
         s = s.replace(/\b([a-zA-Z0-9']+)\s+\1\b/gi, '$1'); // second pass for triplicates
         // Acoustic corrections for common voice recognizer slips
@@ -202,12 +202,117 @@ document.addEventListener('DOMContentLoaded', () => {
         return s;
     }
 
+    // ===================================================================
+    // AUDIO & MICROPHONE ENGINE (Desktop & Mobile Compatible)
+    // ===================================================================
+    let currentMicStream = null;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let vadAudioContext = null;
+    let vadAnalyser = null;
+    let vadInterval = null;
+
+    // Detect browser supported audio MIME type
+    function getSupportedMimeType() {
+        const types = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/mp4',
+            'audio/ogg;codecs=opus',
+            'audio/wav'
+        ];
+        for (const t of types) {
+            if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) {
+                return t;
+            }
+        }
+        return '';
+    }
+
+    // Direct microphone access with native prompt
+    async function requestMicStream() {
+        if (currentMicStream && currentMicStream.active && currentMicStream.getAudioTracks().some(t => t.readyState === 'live')) {
+            return currentMicStream;
+        }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("Microphone API not supported in this browser.");
+        }
+        currentMicStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            }
+        });
+        return currentMicStream;
+    }
+
+    // Web Audio Voice Activity Detection (VAD) for hands-free voice mode
+    function setupVAD(stream, onSilence) {
+        cleanupVAD();
+        try {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+            vadAudioContext = new AudioContextClass();
+            if (vadAudioContext.state === 'suspended') {
+                vadAudioContext.resume().catch(() => {});
+            }
+            const source = vadAudioContext.createMediaStreamSource(stream);
+            vadAnalyser = vadAudioContext.createAnalyser();
+            vadAnalyser.fftSize = 256;
+            source.connect(vadAnalyser);
+
+            const bufferLength = vadAnalyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            let hasSpoken = false;
+            let silenceStart = null;
+
+            vadInterval = setInterval(() => {
+                if (!isRecording || isSpeaking) return;
+                vadAnalyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    sum += dataArray[i];
+                }
+                const avg = sum / bufferLength;
+
+                if (avg > 10) {
+                    hasSpoken = true;
+                    silenceStart = null;
+                    updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.85;">(Speaking)</small>');
+                } else if (hasSpoken && (voiceModeActive || isRecording)) {
+                    if (!silenceStart) {
+                        silenceStart = Date.now();
+                    } else if (Date.now() - silenceStart > 1200) {
+                        // 1.2s silence after speech: user finished speaking!
+                        cleanupVAD();
+                        if (onSilence) onSilence();
+                    }
+                }
+            }, 80);
+        } catch (e) {
+            console.warn("VAD setup warning:", e);
+        }
+    }
+
+    function cleanupVAD() {
+        if (vadInterval) {
+            clearInterval(vadInterval);
+            vadInterval = null;
+        }
+        if (vadAudioContext) {
+            try { vadAudioContext.close(); } catch (e) {}
+            vadAudioContext = null;
+        }
+        vadAnalyser = null;
+    }
+
     // --- Web Speech Recognition (STD Mode) ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = null;
 
     if (!SpeechRecognition) {
-        console.log("SpeechRecognition not supported in browser, using HD Mode.");
+        console.log("SpeechRecognition not supported in browser, using HD Whisper Mode.");
         useHDMode = true;
         if (hdToggleBtn) {
             hdToggleBtn.textContent = 'HD';
@@ -241,9 +346,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // In Voice Mode, keep the listening loop active while bot is NOT speaking
-            if (voiceModeActive && !isSpeaking) {
+            if (voiceModeActive && !isSpeaking && !useHDMode) {
                 setTimeout(() => {
-                    if (voiceModeActive && !isSpeaking && !isRecording) {
+                    if (voiceModeActive && !isSpeaking && !isRecording && !useHDMode) {
                         safeStartRecognition();
                     }
                 }, 200);
@@ -255,21 +360,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (event.error === 'no-speech') {
                 return; // Normal pause; let onend handle clean loop
             }
-            if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                isRecording = false;
-                micBtn.classList.remove('recording');
-                voiceModeActive = false;
-                if (voiceModeBtn) voiceModeBtn.classList.remove('active');
-                updateVisualizerState('hidden', '');
-                alert("Please enable microphone permissions in your browser to talk.");
+
+            // Fall back seamlessly to HD Whisper mode on network, not-allowed, or capture errors
+            console.warn(`Speech recognition error '${event.error}'. Auto-switching to HD Whisper mode.`);
+            useHDMode = true;
+            if (hdToggleBtn) {
+                hdToggleBtn.textContent = 'HD';
+                hdToggleBtn.classList.add('hd-active');
+            }
+            stopListening();
+            if (voiceModeActive && !isSpeaking) {
+                setTimeout(() => {
+                    if (voiceModeActive && !isSpeaking) startListeningHD();
+                }, 200);
             }
         };
 
         recognition.onresult = (event) => {
-            // STRICT MUTE: Ignore all mic input while the bot is speaking (prevents blurry echo / self-interruption)
-            if (isSpeaking) {
-                return;
-            }
+            if (isSpeaking) return;
 
             let interim = '';
             let final = '';
@@ -286,7 +394,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const cleanTranscript = cleanSpokenTranscript(raw);
             if (!cleanTranscript) return;
 
-            // Clear, live transcription feedback for the user without duplicates
             userInput.value = cleanTranscript;
             userInput.dispatchEvent(new Event('input'));
             updateVisualizerState('listening', '<span>🎙️ ' + cleanTranscript.slice(-36) + '</span>');
@@ -305,75 +412,182 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function safeStartRecognition() {
-        if (!recognition || isSpeaking) return;
-        try {
-            recognition.abort(); // Cancel and flush any pending internal audio/result queue
-        } catch (e) { }
+        if (!recognition || isSpeaking || isRecording) return;
         try {
             recognition.start();
             isRecording = true;
             micBtn.classList.add('recording');
         } catch (e) {
-            if (e.name !== 'InvalidStateError') {
-                console.warn("Recognition start note:", e);
+            if (e.name === 'InvalidStateError') {
+                // Recognition is already active or in process
+                isRecording = true;
+                micBtn.classList.add('recording');
+            } else {
+                console.warn("Recognition start failed, switching to HD Whisper mode:", e);
+                useHDMode = true;
+                if (hdToggleBtn) {
+                    hdToggleBtn.textContent = 'HD';
+                    hdToggleBtn.classList.add('hd-active');
+                }
+                startListeningHD();
             }
         }
     }
 
-    // --- MediaRecorder (HD Mode) ---
-    let mediaRecorder = null;
-    let audioChunks = [];
+    // --- HD Mode: MediaRecorder + Groq Whisper ---
+    async function startListeningHD() {
+        if (isSpeaking) stopSpeaking();
+        if (isRecording) return;
 
+        try {
+            const stream = await requestMicStream();
+            const mimeType = getSupportedMimeType();
+            const options = mimeType ? { mimeType } : {};
+            mediaRecorder = new MediaRecorder(stream, options);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = e => {
+                if (e.data && e.data.size > 0) audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                cleanupVAD();
+                isRecording = false;
+                micBtn.classList.remove('recording');
+
+                if (audioChunks.length === 0) {
+                    if (voiceModeActive && !isSpeaking) {
+                        setTimeout(() => { if (voiceModeActive && !isSpeaking && !isRecording) startListening(); }, 300);
+                    }
+                    return;
+                }
+
+                const actualMime = mediaRecorder.mimeType || mimeType || 'audio/webm';
+                const audioBlob = new Blob(audioChunks, { type: actualMime });
+                audioChunks = [];
+
+                // Filter out tiny clicks (under 3.5KB) unless explicit user send
+                if (audioBlob.size < 3500 && !pendingSendFromVoice) {
+                    if (voiceModeActive && !isSpeaking) {
+                        setTimeout(() => { if (voiceModeActive && !isSpeaking && !isRecording) startListening(); }, 300);
+                    }
+                    return;
+                }
+
+                micBtn.classList.add('processing');
+                updateVisualizerState('thinking', '<span>⚡ Transcribing HD Audio...</span>');
+
+                const ext = actualMime.includes('mp4') ? 'recording.mp4' : (actualMime.includes('ogg') ? 'recording.ogg' : 'recording.webm');
+                const formData = new FormData();
+                formData.append('audio', audioBlob, ext);
+
+                try {
+                    const response = await fetch(`${API_BASE}/api/transcribe`, { method: 'POST', body: formData });
+                    const data = await response.json();
+                    micBtn.classList.remove('processing');
+
+                    if (data.success && data.text && data.text.trim()) {
+                        const cleanText = cleanSpokenTranscript(data.text);
+                        userInput.value = cleanText;
+                        userInput.dispatchEvent(new Event('input'));
+                        if (voiceModeActive || pendingSendFromVoice) {
+                            pendingSendFromVoice = false;
+                            sendMessage();
+                        }
+                    } else {
+                        console.log("Transcription returned no text or error:", data);
+                        if (voiceModeActive && !isSpeaking) {
+                            updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.85;">(Speak now)</small>');
+                            setTimeout(() => { if (voiceModeActive && !isSpeaking && !isRecording) startListening(); }, 300);
+                        } else {
+                            updateVisualizerState('hidden', '');
+                        }
+                    }
+                } catch (err) {
+                    console.error("Transcription network error:", err);
+                    micBtn.classList.remove('processing');
+                    if (voiceModeActive && !isSpeaking) {
+                        updateVisualizerState('listening', '<span>🎙️ Listening...</span>');
+                        setTimeout(() => { if (voiceModeActive && !isSpeaking && !isRecording) startListening(); }, 400);
+                    }
+                }
+            };
+
+            isRecording = true;
+            micBtn.classList.add('recording');
+            updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.85;">(Speak now)</small>');
+            mediaRecorder.start(250);
+
+            // Voice activity detection auto-stops recording on silence
+            setupVAD(stream, () => {
+                if (isRecording && mediaRecorder && mediaRecorder.state === 'recording') {
+                    pendingSendFromVoice = true;
+                    stopListeningHD();
+                }
+            });
+
+        } catch (err) {
+            console.error("Microphone access failed:", err);
+            isRecording = false;
+            micBtn.classList.remove('recording');
+            if (voiceModeActive) {
+                voiceModeActive = false;
+                if (voiceModeBtn) voiceModeBtn.classList.remove('active');
+            }
+            updateVisualizerState('hidden', '');
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                addErrorMessage("Microphone access was blocked. Please allow microphone permissions in your browser's address bar (click the lock or camera/mic icon), then try again.");
+            } else {
+                addErrorMessage("Unable to access microphone (" + (err.message || err.name) + "). Please verify your microphone connection.");
+            }
+        }
+    }
+
+    function stopListeningHD() {
+        cleanupVAD();
+        isRecording = false;
+        micBtn.classList.remove('recording');
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            try { mediaRecorder.stop(); } catch (e) {}
+        }
+    }
+
+    // --- Unified Start / Stop Listening ---
     async function startListening() {
         if (isSpeaking) {
             stopSpeaking();
         }
         if (isRecording) return;
 
-        if (useHDMode) {
+        if (useHDMode || !SpeechRecognition) {
+            await startListeningHD();
+        } else {
+            // In STD mode, first prompt mic permission via getUserMedia so desktop Chrome displays native dialog!
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-                audioChunks = [];
-                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const formData = new FormData();
-                    formData.append('audio', audioBlob, 'recording.webm');
-                    micBtn.classList.add('processing');
-                    updateVisualizerState('thinking', '<span>⚡ Transcribing HD Audio...</span>');
-                    try {
-                        const response = await fetch(`${API_BASE}/api/transcribe`, { method: 'POST', body: formData });
-                        const data = await response.json();
-                        if (data.success && data.text) {
-                            userInput.value = data.text;
-                            sendMessage();
-                        }
-                    } catch (err) { console.error('Transcription error:', err); }
-                    micBtn.classList.remove('processing');
-                    stream.getTracks().forEach(track => track.stop());
-                };
-                isRecording = true;
-                micBtn.classList.add('recording');
-                updateVisualizerState('listening', '<span>🎙️ Listening HD...</span>');
-                mediaRecorder.start();
+                await requestMicStream();
             } catch (err) {
-                console.error('Microphone access failed:', err);
-                isRecording = false;
+                console.warn("getUserMedia probe notice:", err);
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    addErrorMessage("Microphone permission was denied. Please allow microphone access in your browser settings (look for the lock/settings icon in the address bar).");
+                    return;
+                }
             }
-        } else if (recognition) {
             safeStartRecognition();
         }
     }
 
     function stopListening() {
+        cleanupVAD();
+        clearTimeout(silenceTimer);
         isRecording = false;
-        if (useHDMode && mediaRecorder && mediaRecorder.state === 'recording') {
-            try { mediaRecorder.stop(); } catch (e) { }
-        } else if (recognition) {
-            try { recognition.stop(); } catch (e) { }
-        }
         micBtn.classList.remove('recording');
+
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            try { mediaRecorder.stop(); } catch (e) {}
+        }
+        if (recognition) {
+            try { recognition.stop(); } catch (e) {}
+        }
     }
 
     // --- Stop Speaking (Immediate Cutoff & Barge-In) ---
@@ -412,7 +626,6 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/\s+/g, ' ')
             .trim();
 
-        // Speak the full returned paragraph completely (capped safely at 3500 chars to avoid memory issues)
         if (clean.length > 3500) {
             clean = clean.substring(0, 3500).trim();
         }
@@ -422,7 +635,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- High-Quality TTS (ElevenLabs -> Edge TTS -> Browser Fallback) ---
     async function speakWithElevenLabs(text, msgId) {
         stopSpeaking();
-        // Crucial: STOP mic while speaking so the speaker NEVER bleeds into the mic
+        // STOP mic while speaking so the speaker NEVER bleeds into the mic
         stopListening();
 
         const gen = ++speechGen;
@@ -494,7 +707,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const maleVoice = pickMaleBrowserVoice();
         if (maleVoice) utterance.voice = maleVoice;
 
-        // Chrome/Chromium 15-second speech synthesis garbage collection & cutoff fix
         let resumeInterval = setInterval(() => {
             if (!isSpeaking) {
                 clearInterval(resumeInterval);
@@ -574,37 +786,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Tap/Click Interruption (Barge-In) ---
     if (voiceVisualizer) {
-        voiceVisualizer.addEventListener('click', (e) => {
+        voiceVisualizer.addEventListener('click', async (e) => {
             e.preventDefault();
             if (isSpeaking) {
                 console.log("Tap on Visualizer interrupted speech.");
                 stopSpeaking();
                 userInput.value = '';
-                startListening();
+                await startListening();
             } else if (isRecording) {
+                pendingSendFromVoice = true;
                 stopListening();
-                if (userInput.value.trim()) sendMessage();
+                if (!useHDMode && userInput.value.trim()) sendMessage();
             } else {
-                startListening();
+                await startListening();
             }
         });
     }
 
     if (micBtn) {
-        micBtn.addEventListener('click', (e) => {
+        micBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             unlockAudio();
             if (isSpeaking) {
                 stopSpeaking();
                 userInput.value = '';
-                startListening();
+                await startListening();
                 return;
             }
             if (isRecording) {
+                pendingSendFromVoice = true;
                 stopListening();
-                if (userInput.value.trim()) sendMessage();
+                if (!useHDMode && userInput.value.trim()) sendMessage();
             } else {
-                startListening();
+                await startListening();
             }
         });
     }
@@ -631,9 +845,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Voice Mode Toggle (Clear & Easy: Does NOT talk over user!) ---
+    // --- Voice Mode Toggle (Direct user interaction preserves microphone permission token) ---
     if (voiceModeBtn) {
-        voiceModeBtn.addEventListener('click', (e) => {
+        voiceModeBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             unlockAudio();
 
@@ -645,14 +859,12 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Voice Mode: ${voiceModeActive ? 'ENABLED' : 'DISABLED'}`);
 
             if (voiceModeActive) {
-                // Instantly open the mic cleanly so the user can speak immediately!
                 stopSpeaking();
                 stopListening();
                 userInput.value = '';
-                updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.85;">(Speak now)</small>');
-                setTimeout(() => {
-                    startListening();
-                }, 150);
+                updateVisualizerState('listening', '<span>🎙️ Connecting Mic...</span>');
+                // Directly invoke startListening during click event to satisfy browser user activation!
+                await startListening();
             } else {
                 stopSpeaking();
                 stopListening();
@@ -742,7 +954,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const fallData = await fallResp.json();
                 addAssistantMessage(fallData.response || "No response received.");
                 sendBtn.disabled = false;
-            isSendingMessage = false;
+                isSendingMessage = false;
                 if (autoSpeak) speakWithElevenLabs(fallData.response, null);
                 return;
             }
@@ -832,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         sendBtn.disabled = false;
-            isSendingMessage = false;
+        isSendingMessage = false;
     }
 
     function addUserMessage(text) {
