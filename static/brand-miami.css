@@ -426,3 +426,20 @@ body.brand-miami .toggle-switch { display: none !important; }
         display: none !important;
     }
 }
+
+/* Ensure Miami emblem is strictly sized and never blows up into a banner */
+body.brand-miami .header-icon-badge {
+    width: 36px !important;
+    height: 36px !important;
+    max-width: 36px !important;
+    max-height: 36px !important;
+    border-radius: 10px !important;
+    object-fit: cover !important;
+    background: rgba(10, 26, 10, 0.95) !important;
+    border: 1.5px solid rgba(76, 175, 80, 0.7) !important;
+    box-shadow: 0 0 12px rgba(76, 175, 80, 0.35) !important;
+    flex-shrink: 0 !important;
+    display: inline-block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
