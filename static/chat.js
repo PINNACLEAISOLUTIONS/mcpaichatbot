@@ -326,6 +326,18 @@ document.addEventListener('DOMContentLoaded', () => {
         recognition.maxAlternatives = 1;
         recognition.lang = 'en-US';
 
+        // Mobile Chrome's continuous SpeechRecognition can silently stall mid-listen
+        // (no result/error/end event ever fires) leaving the mic stuck "recording".
+        // HD Whisper mode (MediaRecorder + VAD) is reliable there, so default to it;
+        // the HD toggle still lets a user switch back to native STT manually.
+        if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            useHDMode = true;
+            if (hdToggleBtn) {
+                hdToggleBtn.textContent = 'HD';
+                hdToggleBtn.classList.add('hd-active');
+            }
+        }
+
         recognition.onstart = () => {
             isRecording = true;
             micBtn.classList.add('recording');
