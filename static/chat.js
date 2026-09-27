@@ -412,21 +412,9 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/\s+/g, ' ')
             .trim();
 
-        // In voice mode, keep conversational audio snappy (first 2-3 sentences, max 350 chars)
-        // so it responds in sub-second time and speaks clearly without droning on
-        if (voiceModeActive && clean.length > 360) {
-            const sentences = clean.match(/[^.!?]+[.!?]+/g);
-            if (sentences && sentences.length > 0) {
-                let snippet = '';
-                for (const s of sentences) {
-                    if ((snippet + s).length > 330) break;
-                    snippet += s + ' ';
-                }
-                if (snippet.trim().length > 30) {
-                    return snippet.trim();
-                }
-            }
-            return clean.substring(0, 330).trim() + '...';
+        // Speak the full returned paragraph completely (capped safely at 3500 chars to avoid memory issues)
+        if (clean.length > 3500) {
+            clean = clean.substring(0, 3500).trim();
         }
         return clean;
     }
@@ -506,6 +494,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const maleVoice = pickMaleBrowserVoice();
         if (maleVoice) utterance.voice = maleVoice;
 
+        // Chrome/Chromium 15-second speech synthesis garbage collection & cutoff fix
+        let resumeInterval = setInterval(() => {
+            if (!isSpeaking) {
+                clearInterval(resumeInterval);
+            } else if (window.speechSynthesis && window.speechSynthesis.speaking) {
+                window.speechSynthesis.pause();
+                window.speechSynthesis.resume();
+            }
+        }, 8000);
+
         utterance.onstart = () => {
             isSpeaking = true;
             currentSpeakingMsgId = msgId;
@@ -516,6 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         utterance.onend = () => {
+            clearInterval(resumeInterval);
             isSpeaking = false;
             userInput.value = '';
             if (msgId) updateSpeakButton(msgId, false);
@@ -530,6 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         utterance.onerror = () => {
+            clearInterval(resumeInterval);
             isSpeaking = false;
             if (msgId) updateSpeakButton(msgId, false);
             if (voiceModeActive && !isRecording) startListening();

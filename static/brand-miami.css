@@ -7,7 +7,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap');
 
 body.brand-miami {
-    --bg-dark: #051308;
+    --bg-dark: #0A1A0A;
     --sidebar-bg: rgba(6, 20, 10, 0.96);
     --accent: #4CAF50;
     --accent-glow: rgba(76, 175, 80, 0.45);
@@ -19,10 +19,9 @@ body.brand-miami {
     --text-secondary: #a7f3d0;
     --glass-border: rgba(76, 175, 80, 0.25);
     background:
-        radial-gradient(circle at 10% 15%, rgba(76, 175, 80, 0.16) 0%, transparent 45%),
-        radial-gradient(circle at 85% 80%, rgba(255, 167, 38, 0.10) 0%, transparent 45%),
-        linear-gradient(180deg, rgba(5, 19, 8, 0.94) 0%, rgba(4, 15, 7, 0.98) 100%),
-        #051308 !important;
+        linear-gradient(180deg, rgba(10, 26, 10, 0.82) 0%, rgba(10, 26, 10, 0.65) 45%, rgba(10, 26, 10, 0.88) 100%),
+        url("/static/miami-bg.webp") center / cover no-repeat,
+        #0A1A0A !important;
     color: var(--text-primary);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     margin: 0;
@@ -377,4 +376,53 @@ body.brand-miami .send-button svg {
     stroke: #051308 !important;
     fill: none !important;
     stroke-width: 2.5 !important;
+}
+
+/* Hide toggle switch to give full header space to emblem, title and mic */
+body.brand-miami .toggle-switch { display: none !important; }
+
+/* ===================================================================
+   MOBILE RESPONSIVENESS - GUARANTEE EMBLEM IS NEVER CUT OFF ON CELLPHONES
+   =================================================================== */
+@media (max-width: 600px) {
+    body.brand-miami .chat-header {
+        height: 52px !important;
+        padding: 0 10px !important;
+        gap: 8px !important;
+    }
+    body.brand-miami .header-title {
+        gap: 8px !important;
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+        overflow: hidden !important;
+    }
+    body.brand-miami .header-icon-badge {
+        width: 34px !important;
+        height: 34px !important;
+        border-radius: 8px !important;
+        flex-shrink: 0 !important;
+        object-fit: contain !important;
+        margin: 0 !important;
+    }
+    body.brand-miami .header-text {
+        font-size: 0.95rem !important;
+        letter-spacing: 0.3px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    body.brand-miami .header-controls {
+        flex-shrink: 0 !important;
+        gap: 6px !important;
+    }
+    body.brand-miami .voice-mode-button {
+        padding: 6px 10px !important;
+        height: 34px !important;
+        font-size: 0.75rem !important;
+        gap: 4px !important;
+        flex-shrink: 0 !important;
+    }
+    body.brand-miami .voice-mode-button .voice-text {
+        display: none !important;
+    }
 }
