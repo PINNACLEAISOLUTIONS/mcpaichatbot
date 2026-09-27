@@ -149,3 +149,11 @@ MIAMI_PAGE_SWAPS = [
     ("Welcome! How can I assist you with your business or automation goals today? Feel free to ask about our custom AI agents, automated lead scrapers, 24/7 phone receptionists, or modern web applications.",
      "Welcome to Miami Loves Green! I'm your landscaping assistant. How can I help you transform your outdoor space today? Feel free to ask about our landscape design, irrigation, hardscaping, or request a free consultation."),
 ]
+
+def brand_page(html: str, brand_name: Optional[str] = None) -> str:
+    """Apply brand page swaps to index.html for the given brand."""
+    resolved = resolve_brand(brand_name)
+    if resolved == "miami":
+        for old, new in MIAMI_PAGE_SWAPS:
+            html = html.replace(old, new)
+    return html

@@ -35,7 +35,7 @@ load_dotenv(override=True)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-APP_VERSION = "1.3.3"
+APP_VERSION = "1.3.4"
 
 app = FastAPI(title="Pinnacle AI Expert Chatbot")
 

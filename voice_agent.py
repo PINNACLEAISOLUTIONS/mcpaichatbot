@@ -72,10 +72,10 @@ class VoiceAgent:
 
     # Best-practice ElevenLabs voice settings for lifelike conversational speech
     VOICE_SETTINGS = {
-        "stability": 0.50,          # 0.50 allows natural inflection and emotional cadence
-        "similarity_boost": 0.82,   # 0.82 preserves rich voice timbre and clarity
-        "style": 0.05,              # 0.05 subtle expressiveness
-        "use_speaker_boost": True   # Enhances volume consistency and fidelity
+        "stability": 0.38,          # Lower stability creates natural pitch inflections, breathing, and human cadence
+        "similarity_boost": 0.80,   # Preserves rich voice timbre and clarity
+        "style": 0.20,              # Adds authentic conversational warmth, pauses, and expressive nuance
+        "use_speaker_boost": True   # Enhances volume presence and acoustic warmth
     }
 
     def __init__(self):
@@ -252,7 +252,7 @@ class VoiceAgent:
         if not voice_id or len(voice_id) < 5:
             voice_id = self.VOICES["adam"]
 
-        models_to_try = ["eleven_flash_v2_5", "eleven_turbo_v2_5", "eleven_multilingual_v2"]
+        models_to_try = ["eleven_turbo_v2_5", "eleven_multilingual_v2", "eleven_flash_v2_5"]
 
         # Strategy 1: Direct REST API (Ultra reliable, exact latency params, no SDK version issues)
         headers = {
