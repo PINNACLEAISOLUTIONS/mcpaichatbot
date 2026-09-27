@@ -129,7 +129,7 @@ MIAMI_PAGE_SWAPS = [
     ("<title>Pinnacle AI Expert - Chatbot</title>",
      "<title>Miami Loves Green - Landscaping Assistant</title>"),
     ('<link rel="stylesheet" href="/static/brand-pinnacle.css">',
-     '<link rel="stylesheet" href="/static/brand-miami.css?v=1.4.1">'),
+     '<link rel="stylesheet" href="/static/brand-miami.css?v=1.4.3">'),
     ('<body class="brand-pinnacle">', '<body class="brand-miami">'),
     ('<img class="header-icon-badge" src="/static/pinnacle-logo.png" alt="Pinnacle AI">',
      '<img class="header-icon-badge" src="/static/miami-logo.png" alt="Miami Loves Green" style="width:36px !important;height:36px !important;max-width:36px !important;max-height:36px !important;border-radius:10px !important;object-fit:cover !important;flex-shrink:0 !important;display:inline-block !important;">'),
@@ -158,7 +158,7 @@ def brand_page(html: str, brand_name: Optional[str] = None) -> str:
     resolved = resolve_brand(brand_name)
     if resolved == "miami":
         # 1. Ensure brand-miami.css is loaded regardless of query param on brand-pinnacle.css
-        html = re.sub(r'/static/brand-pinnacle\.css[^"\'>]*', '/static/brand-miami.css?v=1.4.2', html)
+        html = re.sub(r'/static/brand-pinnacle\.css[^"\'>]*', '/static/brand-miami.css?v=1.4.3', html)
         # 2. Apply all standard string swaps
         for old, new in MIAMI_PAGE_SWAPS:
             html = html.replace(old, new)

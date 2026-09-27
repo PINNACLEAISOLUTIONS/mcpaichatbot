@@ -781,11 +781,14 @@ textarea {
     }
 
     .voice-mode-button {
-        padding: 8px 14px;
+        padding: 5px 9px;
+        flex-shrink: 0;
+        white-space: nowrap;
     }
 
     .voice-text {
-        font-size: 12px;
+        font-size: 11px;
+        white-space: nowrap;
     }
 
     .voice-icon {

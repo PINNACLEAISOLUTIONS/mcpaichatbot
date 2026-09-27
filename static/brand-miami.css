@@ -111,7 +111,7 @@ body.brand-miami .header-title::after {
     flex-shrink: 0;
 }
 
-@media (max-width: 440px) {
+@media (max-width: 600px) {
     body.brand-miami .header-title::after {
         display: none !important;
     }
@@ -416,14 +416,27 @@ body.brand-miami .toggle-switch { display: none !important; }
         gap: 6px !important;
     }
     body.brand-miami .voice-mode-button {
-        padding: 6px 10px !important;
-        height: 34px !important;
-        font-size: 0.75rem !important;
-        gap: 4px !important;
+        padding: 5px 9px !important;
+        height: auto !important;
+        min-height: 32px !important;
+        font-size: 0.72rem !important;
+        gap: 5px !important;
         flex-shrink: 0 !important;
+        border-radius: 16px !important;
     }
     body.brand-miami .voice-mode-button .voice-text {
-        display: none !important;
+        display: inline-block !important;
+        font-size: 0.70rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.2px !important;
+        white-space: nowrap !important;
+        color: #FFA726 !important;
+        -webkit-text-fill-color: #FFA726 !important;
+    }
+    body.brand-miami .voice-mode-button .voice-icon svg {
+        width: 14px !important;
+        height: 14px !important;
+        flex-shrink: 0 !important;
     }
 }
 

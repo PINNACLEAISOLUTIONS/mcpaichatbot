@@ -557,16 +557,40 @@ body.brand-pinnacle .typing-indicator span {
 
 @media (max-width: 600px) {
     body.brand-pinnacle .chat-header {
-        height: 56px !important;
-        padding: 0 14px !important;
+        height: 52px !important;
+        padding: 0 10px !important;
+        gap: 6px !important;
+    }
+    body.brand-pinnacle .header-title {
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+        overflow: hidden !important;
+        gap: 6px !important;
     }
     body.brand-pinnacle .header-icon-badge {
-        width: 38px !important;
-        height: 38px !important;
-        border-radius: 9px !important;
+        width: 32px !important;
+        height: 32px !important;
+        border-radius: 8px !important;
+        flex-shrink: 0 !important;
     }
     body.brand-pinnacle .header-text {
-        font-size: 1.0rem !important;
-        letter-spacing: 0.5px !important;
+        font-size: 0.88rem !important;
+        letter-spacing: 0.3px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    body.brand-pinnacle .voice-mode-button {
+        padding: 5px 9px !important;
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+        height: auto !important;
+        min-height: 32px !important;
+        border-radius: 16px !important;
+    }
+    body.brand-pinnacle .voice-text {
+        font-size: 0.72rem !important;
+        white-space: nowrap !important;
+        display: inline-block !important;
     }
 }
