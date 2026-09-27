@@ -1,7 +1,7 @@
 # Pinnacle AI Solutions - Comprehensive Business Knowledge Base
-Website: https://pinnacleaisolutions.site
+Website: https://tinyurl.com/pinnacle-ai-reception
 Phone: (904) 686-6593
-Email: futureai4all@gmail.com
+Email: pinnacleaisoultions@gmail.com
 
 ---
 
@@ -72,5 +72,5 @@ Automated lead generation systems that extract targeted prospects from multiple 
 
 ## Contact & Booking Information
 - **Phone**: **(904) 686-6593** (Call or text for consultations and free AI audits)
-- **Email**: **futureai4all@gmail.com**
-- **Website**: **https://pinnacleaisolutions.site**
+- **Email**: **pinnacleaisoultions@gmail.com**
+- **Website**: **https://tinyurl.com/pinnacle-ai-reception**

@@ -1573,7 +1573,7 @@ class PinnacleChatbot:
     async def _send_lead_email(
         self, interest_detail: str, user_info: Optional[str] = None
     ):
-        """Send lead notification email to futureai4all@gmail.com using centralized utils."""
+        """Send lead notification email to pinnacleaisoultions@gmail.com using centralized utils."""
         # Construct lead data payload for email_utils
         lead_data = {
             "name": user_info or "Website Visitor",

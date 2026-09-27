@@ -26,7 +26,7 @@ BRAND_NAME = "Miami Loves Green" if IS_MIAMI else "Pinnacle AI"
 
 def generate_mailto_link(lead_data: dict) -> str:
     """Generate a mailto link for client-side email submission."""
-    to_email = os.getenv("LEAD_TO_EMAIL", "futureai4all@gmail.com")
+    to_email = os.getenv("LEAD_TO_EMAIL", "pinnacleaisoultions@gmail.com")
     subject = f"🚀 New Project Inquiry: {lead_data.get('name')}"
 
     body = f"""
@@ -58,13 +58,13 @@ def send_lead_email(lead_data: dict, brand_name: str = None) -> bool:
     smtp_host = os.getenv("SMTP_HOST") or os.getenv("GMAIL_HOST") or "smtp.gmail.com"
     smtp_port = os.getenv("SMTP_PORT") or os.getenv("GMAIL_PORT") or "587"
     smtp_user = (
-        os.getenv("SMTP_USER") or os.getenv("GMAIL_USER") or "futureai4all@gmail.com"
+        os.getenv("SMTP_USER") or os.getenv("GMAIL_USER") or "pinnacleaisoultions@gmail.com"
     )
     smtp_pass = os.getenv("SMTP_PASS") or os.getenv("GMAIL_APP_PASSWORD")
     lead_to = (
         os.getenv("LEAD_TO_EMAIL")
         or os.getenv("GMAIL_USER")
-        or "futureai4all@gmail.com"
+        or "pinnacleaisoultions@gmail.com"
     )
 
     # API Keys
@@ -137,7 +137,7 @@ def send_lead_email(lead_data: dict, brand_name: str = None) -> bool:
             try:
                 logger.info("Attempting to send email via SendGrid API...")
                 message = Mail(
-                    from_email=os.getenv("SENDGRID_FROM", "futureai4all@gmail.com"),
+                    from_email=os.getenv("SENDGRID_FROM", "pinnacleaisoultions@gmail.com"),
                     to_emails=lead_to,
                     subject=f"🚀 New Project: {lead_data.get('name')} - {resolved_brand_name}",
                     html_content=body,
