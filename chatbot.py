@@ -744,36 +744,7 @@ class PinnacleChatbot:
             res_content = await self._process_lead_step(user_message)
             return {"response": res_content}
 
-        # 2. Permission Request Flow (Intercept)
-        if self.lead_state["awaiting_permission"]:
-            # Check if user said yes/sure/ok/etc
-            affirmative_keywords = [
-                "yes",
-                "sure",
-                "ok",
-                "yeah",
-                "yep",
-                "proceed",
-                "go ahead",
-                "fine",
-            ]
-            negative_keywords = ["no", "nope", "not now", "later", "cancel"]
-            msg_lower = user_message.lower()
-
-            if any(kw in msg_lower for kw in affirmative_keywords):
-                res_content = await self._start_lead_capture()
-                return {"response": res_content}
-            elif any(kw in msg_lower for kw in negative_keywords):
-                res_content = "No problem! Feel free to ask me any questions about our services, or request a quote whenever you're ready. You can also contact us directly at (904) 686-6593 or futureai4all@gmail.com."
-                return {"response": res_content}
-            else:
-                res_content = "I didn't quite catch that. Would you like me to proceed with collecting your information for a quote? (Please say 'yes' or 'no')"
-                return {"response": res_content}
-
-        # 3. Intent Detection for Quote Request
-        if self._detect_quote_intent(user_message):
-            res_content = await self._request_quote_permission()
-            return {"response": res_content}
+        # Note: Quote and consultation inquiries are answered intelligently by LLM with full context
 
         # ========== LOCAL BUSINESS CONTEXT (ADDITIVE) ==========
         # Detect location from user message for personalized advice
@@ -1232,40 +1203,7 @@ class PinnacleChatbot:
             yield f"data: {_json.dumps({'type': 'done', 'response': res})}\n\n"
             return
 
-        # 2. Permission Request
-        if self.lead_state["awaiting_permission"]:
-            affirmative_keywords = [
-                "yes",
-                "sure",
-                "ok",
-                "yeah",
-                "yep",
-                "proceed",
-                "go ahead",
-                "fine",
-            ]
-            negative_keywords = ["no", "nope", "not now", "later", "cancel"]
-            msg_lower = user_message.lower()
-            if any(kw in msg_lower for kw in affirmative_keywords):
-                res = await self._start_lead_capture()
-            elif any(kw in msg_lower for kw in negative_keywords):
-                res = (
-                    "No problem! Feel free to ask me any questions about our services."
-                )
-            else:
-                res = (
-                    "I didn't quite catch that. Would you like me to proceed? (yes/no)"
-                )
-            yield f"data: {_json.dumps({'type': 'token', 'content': res})}\n\n"
-            yield f"data: {_json.dumps({'type': 'done', 'response': res})}\n\n"
-            return
-
-        # 3. Quote Intent
-        if self._detect_quote_intent(user_message):
-            res = await self._request_quote_permission()
-            yield f"data: {_json.dumps({'type': 'token', 'content': res})}\n\n"
-            yield f"data: {_json.dumps({'type': 'done', 'response': res})}\n\n"
-            return
+        # Note: Quote and consultation inquiries are answered intelligently by LLM with full context
 
         # Location + KB
         self._detect_location(user_message)
