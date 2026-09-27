@@ -186,6 +186,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    
+    // --- Clean Spoken Transcript (Eliminates Browser Speech Stutter, Duplicates, and Overlaps) ---
+    function cleanSpokenTranscript(text) {
+        if (!text) return '';
+        let s = text.replace(/\s+/g, ' ').trim();
+        // Collapse repeated phrases (1 to 5 words repeated consecutively)
+        s = s.replace(/\b((?:[a-zA-Z0-9']+\s+){1,5}[a-zA-Z0-9']+)\s+\1\b/gi, '$1');
+        // Collapse single repeated words (e.g. "what what" -> "what", "is is" -> "is", "the the" -> "the", "us us" -> "us")
+        s = s.replace(/\b([a-zA-Z0-9']+)\s+\1\b/gi, '$1');
+        s = s.replace(/\b([a-zA-Z0-9']+)\s+\1\b/gi, '$1'); // second pass for triplicates
+        // Acoustic corrections for common voice recognizer slips
+        s = s.replace(/\bwhat\s+us\s+the\b/gi, 'what is the');
+        s = s.replace(/\bwhat\s+us\b/gi, 'what is');
+        return s;
+    }
+
     // --- Web Speech Recognition (STD Mode) ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = null;
@@ -219,6 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // If user finished speaking and text is present, auto-send
             if (userInput.value.trim() && voiceModeActive && !isSpeaking) {
+                clearTimeout(silenceTimer);
                 sendMessage();
                 return;
             }
@@ -254,26 +271,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            let transcript = '';
+            let interim = '';
+            let final = '';
             for (let i = 0; i < event.results.length; ++i) {
-                transcript += event.results[i][0].transcript;
+                const res = event.results[i];
+                if (res.isFinal) {
+                    final += res[0].transcript + ' ';
+                } else {
+                    interim += res[0].transcript;
+                }
             }
-            const cleanTranscript = transcript.trim();
+
+            const raw = (final + interim).trim();
+            const cleanTranscript = cleanSpokenTranscript(raw);
             if (!cleanTranscript) return;
 
-            // Clear, live transcription feedback for the user
+            // Clear, live transcription feedback for the user without duplicates
             userInput.value = cleanTranscript;
             userInput.dispatchEvent(new Event('input'));
-            updateVisualizerState('listening', '<span>🎙️ ' + cleanTranscript.slice(-32) + '</span>');
+            updateVisualizerState('listening', '<span>🎙️ ' + cleanTranscript.slice(-36) + '</span>');
 
-            // Auto-send after 1.3s of silence once user finishes speaking
+            // Auto-send after 1.3s of clean silence once user finishes speaking
             clearTimeout(silenceTimer);
             silenceTimer = setTimeout(() => {
                 if (userInput.value.trim() && (voiceModeActive || isRecording) && !isSpeaking) {
                     stopListening();
                     setTimeout(() => {
                         if (userInput.value.trim()) sendMessage();
-                    }, 120);
+                    }, 80);
                 }
             }, 1300);
         };
@@ -282,10 +307,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function safeStartRecognition() {
         if (!recognition || isSpeaking) return;
         try {
+            recognition.abort(); // Cancel and flush any pending internal audio/result queue
+        } catch (e) { }
+        try {
             recognition.start();
             isRecording = true;
             micBtn.classList.add('recording');
         } catch (e) {
+            if (e.name !== 'InvalidStateError') {
+                console.warn("Recognition start note:", e);
+            }
+        }
+    } catch (e) {
             if (e.name !== 'InvalidStateError') {
                 console.warn("Recognition start note:", e);
             }
@@ -662,8 +695,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Send Message & Stream ---
+    let isSendingMessage = false;
     async function sendMessage() {
-        const text = userInput.value.trim();
+        if (isSendingMessage) return;
+        const text = cleanSpokenTranscript(userInput.value.trim());
         if (!text || sendBtn.disabled) return;
 
         stopSpeaking();
@@ -673,6 +708,7 @@ document.addEventListener('DOMContentLoaded', () => {
         userInput.value = '';
         userInput.style.height = 'auto';
         sendBtn.disabled = true;
+        isSendingMessage = true;
 
         if (voiceModeActive) {
             updateVisualizerState('thinking', '<span>⚡ Thinking...</span>');
@@ -711,6 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const fallData = await fallResp.json();
                 addAssistantMessage(fallData.response || "No response received.");
                 sendBtn.disabled = false;
+            isSendingMessage = false;
                 if (autoSpeak) speakWithElevenLabs(fallData.response, null);
                 return;
             }
@@ -800,6 +837,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         sendBtn.disabled = false;
+            isSendingMessage = false;
     }
 
     function addUserMessage(text) {
