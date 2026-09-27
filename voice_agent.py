@@ -49,17 +49,18 @@ class VoiceAgent:
         "rachel": "21m00Tcm4TlvDq8ikWAM",    # Rachel (Professional, warm)
         "bella": "EXAVITQu4vr4xnSDxMaL",     # Bella (Young, upbeat)
         # Aliases
-        "pinnacle": "pNInz6obpgDQGcFmaJgB",  # Default Pinnacle: Adam
-        "miami": "pNInz6obpgDQGcFmaJgB",     # Default Miami: Adam
+        "pinnacle": "CwhRBWXzGAHq8TQ4Fs17",  # Default Pinnacle: Roger
+        "miami": "CwhRBWXzGAHq8TQ4Fs17",     # Default Miami: Roger
         "josh": "pNInz6obpgDQGcFmaJgB",      # Legacy josh mapped to Adam
     }
-    DEFAULT_VOICE = "adam"
+    DEFAULT_VOICE = "roger"
 
     # Edge TTS Voice Map - Microsoft's highest fidelity neural voices
     EDGE_VOICES = {
-        "adam": "en-US-AndrewNeural",        # Microsoft's top conversational male voice
-        "pinnacle": "en-US-AndrewNeural",
-        "miami": "en-US-AndrewNeural",
+        "adam": "en-US-AndrewNeural",
+        "roger": "en-US-ChristopherNeural",
+        "pinnacle": "en-US-ChristopherNeural",
+        "miami": "en-US-ChristopherNeural",
         "antoni": "en-US-AndrewNeural",
         "eric": "en-US-EricNeural",
         "brian": "en-US-BrianNeural",
@@ -85,8 +86,8 @@ class VoiceAgent:
         
         # Check custom voice overrides
         self.custom_voice_id = os.getenv("ELEVENLABS_VOICE_ID", "").strip() or None
-        self.pinnacle_voice_id = os.getenv("ELEVENLABS_VOICE_ID_PINNACLE", "").strip() or self.custom_voice_id or self.VOICES["adam"]
-        self.miami_voice_id = os.getenv("ELEVENLABS_VOICE_ID_MIAMI", "").strip() or self.custom_voice_id or self.VOICES["adam"]
+        self.pinnacle_voice_id = os.getenv("ELEVENLABS_VOICE_ID_PINNACLE", "").strip() or self.custom_voice_id or self.VOICES["roger"]
+        self.miami_voice_id = os.getenv("ELEVENLABS_VOICE_ID_MIAMI", "").strip() or self.custom_voice_id or self.VOICES["roger"]
 
         if self.custom_voice_id:
             logger.info(f"🎤 Custom ElevenLabs Voice ID detected: {self.custom_voice_id}")

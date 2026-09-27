@@ -364,7 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getPreferredVoice() {
-        return activeBrand;
+        return 'roger';
     }
 
     // Clean text into natural conversational spoken English
