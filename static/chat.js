@@ -681,13 +681,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const loader = showTypingIndicator();
 
         try {
-            const resp = await fetch(`${API_BASE}/api/chat/stream`, {
+            const resp = await fetch(`${API_BASE}/api/chat`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream'
+                },
                 body: JSON.stringify({
                     message: text,
                     session_id: currentSessionId,
-                    brand: activeBrand
+                    brand: activeBrand,
+                    stream: true
                 })
             });
 

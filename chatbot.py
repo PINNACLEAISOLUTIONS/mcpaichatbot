@@ -22,6 +22,7 @@ import db_utils
 import sqlite3
 import conversation_logger  # Conversation logging (non-intrusive)
 import email_utils
+import neon_sync
 import brand
 
 
@@ -1653,6 +1654,20 @@ class PinnacleChatbot:
             # Since email_utils.send_lead_email is blocking SMTP, we should run it in executor if possible,
             # but for now direct call is fine or use loop.run_in_executor
             brand_name = getattr(self, 'brand', 'pinnacle')
+            # Sync directly to Neon PostgreSQL leads table
+            asyncio.create_task(
+                neon_sync.insert_inbound_lead_async(
+                    company_name=lead_data.get("name"),
+                    contact_name=lead_data.get("name"),
+                    email=lead_data.get("email") if lead_data.get("email") != "Not provided" else None,
+                    phone=lead_data.get("phone") if lead_data.get("phone") != "Not provided" else None,
+                    status="inbound_chat",
+                    source="website_chat",
+                    brand=brand_name,
+                    notes=f"Lead inquiry: {interest_detail}",
+                    metadata={"session_id": getattr(self, 'session_id', 'unknown'), "brand": brand_name}
+                )
+            )
             phone_num = getattr(self, 'phone', '(904) 686-6593')
             success = await asyncio.to_thread(email_utils.send_lead_email, lead_data, brand_name)
 

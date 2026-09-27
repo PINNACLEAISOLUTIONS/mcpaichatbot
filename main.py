@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 import uvicorn  # type: ignore
@@ -24,6 +25,8 @@ from chatbot import PinnacleChatbot, LLM_ERRORS, _GROQ_MODELS
 from gemini_image_client import GeminiImageClient
 from voice_agent import VoiceAgent
 import email_utils
+import neon_sync
+from neon_sync import process_chat_message_for_leads, insert_inbound_lead_async
 
 # Load env
 load_dotenv(override=True)
@@ -105,6 +108,18 @@ class ChatMessage(BaseModel):
     message: str
     session_id: Optional[str] = None
     brand: Optional[str] = None
+    stream: Optional[bool] = None
+
+
+class LeadRequest(BaseModel):
+    company_name: Optional[str] = None
+    contact_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    source: Optional[str] = "website_chat"
+    brand: Optional[str] = "pinnacle"
+    notes: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class ToolCallRequest(BaseModel):
@@ -194,11 +209,44 @@ async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 
+@app.post("/api/lead")
+async def create_lead_endpoint(lead_req: LeadRequest):
+    """Direct lead submission endpoint syncing to Neon PostgreSQL leads table."""
+    success = await insert_inbound_lead_async(
+        company_name=lead_req.company_name,
+        contact_name=lead_req.contact_name,
+        email=lead_req.email,
+        phone=lead_req.phone,
+        status="inbound_chat",
+        source=lead_req.source or "website_chat",
+        brand=lead_req.brand or "pinnacle",
+        notes=lead_req.notes,
+        metadata=lead_req.metadata,
+    )
+    return {"status": "ok" if success else "error", "synced": success}
+
+
 @app.post("/api/chat")
 async def chat_endpoint(chat_msg: ChatMessage, request: Request):
+    """
+    Primary chat endpoint.
+    Supports both real-time Server-Sent Events (SSE) streaming (stream=True or Accept: text/event-stream)
+    and synchronous JSON responses.
+    Automatically captures visitor leads (email/company/phone) to Neon PostgreSQL with status='inbound_chat'.
+    """
     client_ip = request.client.host if request.client else "unknown"
     session_id = chat_msg.session_id or str(uuid.uuid4())
     user_message = chat_msg.message.strip()
+
+    # Inbound Lead Auto-Capture: scan message for contact/company details and write to Neon
+    asyncio.create_task(
+        process_chat_message_for_leads(
+            user_message=user_message,
+            session_id=session_id,
+            brand=chat_msg.brand,
+            client_ip=client_ip,
+        )
+    )
 
     now = time.time()
     # Clean sliding windows
@@ -237,8 +285,13 @@ async def chat_endpoint(chat_msg: ChatMessage, request: Request):
             detail="You've reached the message limit for this session. Please start a new chat.",
         )
 
-    cache_key = (chat_msg.brand or 'pinnacle', session_id, user_message)
-    if cache_key in response_cache:
+    is_stream = (
+        chat_msg.stream is True
+        or "text/event-stream" in request.headers.get("accept", "")
+    )
+
+    cache_key = (chat_msg.brand or "pinnacle", session_id, user_message)
+    if not is_stream and cache_key in response_cache:
         cached_data = response_cache[cache_key]
         if (
             isinstance(cached_data, dict)
@@ -252,6 +305,23 @@ async def chat_endpoint(chat_msg: ChatMessage, request: Request):
     session_total_counts[session_id] += 1
 
     chatbot_instance = get_chatbot(session_id, brand_name=chat_msg.brand)
+
+    # STREAMING PATH (Server-Sent Events)
+    if is_stream:
+        async def event_generator():
+            import json as _json
+
+            try:
+                async for chunk in chatbot_instance.send_message_stream(user_message):
+                    yield chunk
+                yield f"data: {_json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
+            except Exception as e:
+                logger.error(f"Stream error on /api/chat: {e}")
+                yield f"data: {_json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+    # NON-STREAMING PATH (JSON)
     try:
         response = await chatbot_instance.send_message(user_message)
         if isinstance(response, dict) and "response" in response:
@@ -265,63 +335,9 @@ async def chat_endpoint(chat_msg: ChatMessage, request: Request):
 
 @app.post("/api/chat/stream")
 async def chat_stream_endpoint(chat_msg: ChatMessage, request: Request):
-    """SSE streaming endpoint — tokens arrive in real-time."""
-    client_ip = request.client.host if request.client else "unknown"
-    session_id = chat_msg.session_id or str(uuid.uuid4())
-    user_message = chat_msg.message.strip()
-
-    now = time.time()
-    ip_request_counts[client_ip] = [
-        t for t in ip_request_counts[client_ip] if now - t < 600
-    ]
-    session_request_counts[session_id] = [
-        t
-        for t in session_request_counts[session_id]
-        if now - t < RATE_LIMIT_SESSION_COOLDOWN
-    ]
-
-    # Anti-spam checks
-    recent_1min = [t for t in ip_request_counts[client_ip] if now - t < 60]
-    if len(recent_1min) >= RATE_LIMIT_IP_PER_MINUTE:
-        raise HTTPException(
-            status_code=429,
-            detail="Slow down! Too many messages. Please wait a moment.",
-        )
-    if len(ip_request_counts[client_ip]) >= RATE_LIMIT_IP_PER_10MIN:
-        raise HTTPException(
-            status_code=429,
-            detail="You've sent a lot of messages. Please take a short break and try again.",
-        )
-    if len(session_request_counts[session_id]) >= 1:
-        raise HTTPException(
-            status_code=429,
-            detail=f"Please wait {RATE_LIMIT_SESSION_COOLDOWN} seconds between messages.",
-        )
-    if session_total_counts[session_id] >= RATE_LIMIT_SESSION_TOTAL:
-        raise HTTPException(
-            status_code=429,
-            detail="You've reached the message limit for this session. Please start a new chat.",
-        )
-
-    ip_request_counts[client_ip].append(now)
-    session_request_counts[session_id].append(now)
-    session_total_counts[session_id] += 1
-
-    chatbot_instance = get_chatbot(session_id, brand_name=chat_msg.brand)
-
-    async def event_generator():
-        import json as _json
-
-        try:
-            async for chunk in chatbot_instance.send_message_stream(user_message):
-                yield chunk
-            # Send session_id as final metadata
-            yield f"data: {_json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
-        except Exception as e:
-            logger.error(f"Stream error: {e}")
-            yield f"data: {_json.dumps({'type': 'error', 'content': str(e)})}\n\n"
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    """SSE streaming alias for /api/chat with stream=True."""
+    chat_msg.stream = True
+    return await chat_endpoint(chat_msg, request)
 
 
 @app.get("/api/sessions")
