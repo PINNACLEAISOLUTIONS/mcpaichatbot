@@ -453,7 +453,8 @@ async def elevenlabs_tts_premium(request: Dict[str, str]):
 @app.post("/api/transcribe")
 async def transcribe_audio(audio: UploadFile = File(...)):
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
+        suffix = Path(audio.filename or "").suffix or ".webm"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(await audio.read())
             tmp_path = tmp.name
         from groq import Groq  # type: ignore
