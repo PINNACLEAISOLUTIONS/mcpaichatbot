@@ -111,6 +111,8 @@ class PinnacleChatbot:
         raw_gemini = os.getenv("GEMINI_API_KEY")
         self.groq_api_key = raw_groq.strip() if raw_groq else None
         self.gemini_api_key = raw_gemini.strip() if raw_gemini else None
+        raw_or = os.getenv("OPENROUTER_API_KEY")
+        self.openrouter_api_key = raw_or.strip() if raw_or else None
 
         # Update os.environ with sanitized keys so LiteLLM doesn't read the raw ones
         if self.groq_api_key:
@@ -1271,6 +1273,12 @@ class PinnacleChatbot:
                 "gemini/gemini-2.5-flash-lite",
                 "gemini/gemini-3.5-flash",
             ]
+        if self.openrouter_api_key:  # free models, higher limits since the account has credits
+            chain += [
+                "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+                "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+                "openrouter/qwen/qwen3.8-27b:free",
+            ]
         now = time.time()
         chain = [m for m in chain if now - _DEAD_MODELS.get(m, 0) > DEAD_MODEL_TTL]
         if not chain:
@@ -1320,6 +1328,8 @@ class PinnacleChatbot:
                     completion_kwargs["api_key"] = self.gemini_api_key
                 elif model_name.startswith("groq/") and self.groq_api_key:
                     completion_kwargs["api_key"] = self.groq_api_key
+                elif model_name.startswith("openrouter/") and self.openrouter_api_key:
+                    completion_kwargs["api_key"] = self.openrouter_api_key
 
                 response = await litellm.acompletion(**completion_kwargs)
                 got_content = False
@@ -1409,6 +1419,8 @@ class PinnacleChatbot:
                         completion_kwargs["api_key"] = self.gemini_api_key
                     elif model_name.startswith("groq/") and self.groq_api_key:
                         completion_kwargs["api_key"] = self.groq_api_key
+                    elif model_name.startswith("openrouter/") and self.openrouter_api_key:
+                        completion_kwargs["api_key"] = self.openrouter_api_key
 
                     response = await litellm.acompletion(**completion_kwargs)
 
