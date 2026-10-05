@@ -604,3 +604,10 @@ async def transcribe_audio(audio: UploadFile = File(...)):
 
     _stt_state["last_error"] = " | ".join(errors)
     return {"success": False, "error": "unavailable", "message": "Voice input is temporarily unavailable."}
+
+
+app.mount("/static", StaticFiles(directory=str(static_path), html=True), name="static")
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8001))
+    uvicorn.run(app, host="0.0.0.0", port=port)
