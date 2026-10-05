@@ -442,6 +442,11 @@ async def status_endpoint():
             "sendgrid": bool(os.getenv("SENDGRID_API_KEY")),
             "resend": bool(os.getenv("RESEND_API_KEY")),
         },
+        "voice_input": {
+            "groq_key": bool(os.getenv("GROQ_API_KEY")),
+            "gemini_fallback": bool(os.getenv("GEMINI_API_KEY")),
+            **_stt_state,
+        },
         "llm": {
             "groq_key": bool(os.getenv("GROQ_API_KEY")),
             "gemini_key": bool(os.getenv("GEMINI_API_KEY")),
@@ -513,28 +518,89 @@ async def elevenlabs_tts_premium(request: Dict[str, str]):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+_stt_state: Dict[str, Any] = {"last_error": None, "last_provider": None, "last_ok": None}
+MAX_AUDIO_BYTES = 25 * 1024 * 1024
+
+
+def _transcribe_groq(data: bytes, filename: str) -> str:
+    from groq import Groq  # type: ignore
+
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"), timeout=45.0)
+    last: Optional[Exception] = None
+    for model in ("whisper-large-v3-turbo", "whisper-large-v3"):
+        try:
+            result = client.audio.transcriptions.create(
+                model=model,
+                file=(filename, data),
+                response_format="text",
+                language="en",
+            )
+            return str(result).strip()
+        except Exception as e:  # try the next model
+            last = e
+            logger.warning(f"Groq transcription with {model} failed: {e}")
+    raise last or RuntimeError("Groq transcription failed")
+
+
+def _transcribe_gemini(data: bytes, mime: str) -> str:
+    from google import genai  # type: ignore
+    from google.genai import types  # type: ignore
+
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    model = os.getenv("GEMINI_TRANSCRIBE_MODEL", "gemini-2.5-flash")
+    resp = client.models.generate_content(
+        model=model,
+        contents=[
+            types.Part.from_bytes(data=data, mime_type=mime),
+            "Transcribe this audio exactly. Reply with only the spoken words. "
+            "If there is no speech, reply with nothing.",
+        ],
+    )
+    return (resp.text or "").strip()
+
+
 @app.post("/api/transcribe")
 async def transcribe_audio(audio: UploadFile = File(...)):
-    try:
-        suffix = Path(audio.filename or "").suffix or ".webm"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(await audio.read())
-            tmp_path = tmp.name
-        from groq import Groq  # type: ignore
+    """Speech-to-text with fallbacks: Groq Whisper first, then Gemini.
 
-        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        with open(tmp_path, "rb") as f:
-            transcription = client.audio.transcriptions.create(
-                model="whisper-large-v3", file=f, response_format="text"
-            )
-        os.unlink(tmp_path)
-        return {"success": True, "text": str(transcription)}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+    Always returns JSON: {success, text, provider} or {success: False, error, message}.
+    `error` is a short code the chat UI maps to a friendly message.
+    """
+    from starlette.concurrency import run_in_threadpool  # type: ignore
 
+    data = await audio.read()
+    if len(data) > MAX_AUDIO_BYTES:
+        return {"success": False, "error": "too_large", "message": "Recording is too long."}
+    if len(data) < 1000:
+        return {"success": False, "error": "no_audio", "message": "No audio was received."}
 
-app.mount("/static", StaticFiles(directory=str(static_path), html=True), name="static")
+    suffix = Path(audio.filename or "").suffix.lower() or ".webm"
+    filename = f"recording{suffix}"
+    mime = {
+        ".webm": "audio/webm", ".mp4": "audio/mp4", ".m4a": "audio/mp4",
+        ".ogg": "audio/ogg", ".wav": "audio/wav", ".mp3": "audio/mpeg",
+    }.get(suffix, audio.content_type or "audio/webm")
 
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8001))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    providers = []
+    if os.getenv("GROQ_API_KEY"):
+        providers.append(("groq", lambda: _transcribe_groq(data, filename)))
+    if os.getenv("GEMINI_API_KEY"):
+        providers.append(("gemini", lambda: _transcribe_gemini(data, mime)))
+    if not providers:
+        _stt_state["last_error"] = "no STT API key configured"
+        return {"success": False, "error": "unavailable", "message": "Voice input is not configured."}
+
+    errors = []
+    for name, fn in providers:
+        try:
+            text = await run_in_threadpool(fn)
+            _stt_state.update(last_provider=name, last_ok=time.time(), last_error=None)
+            if not text:
+                return {"success": False, "error": "no_speech", "message": "No speech detected.", "provider": name}
+            return {"success": True, "text": text, "provider": name}
+        except Exception as e:
+            logger.error(f"STT provider {name} failed: {e}")
+            errors.append(f"{name}: {str(e)[:160]}")
+
+    _stt_state["last_error"] = " | ".join(errors)
+    return {"success": False, "error": "unavailable", "message": "Voice input is temporarily unavailable."}

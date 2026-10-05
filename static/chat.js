@@ -446,7 +446,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- HD Mode: MediaRecorder + Groq Whisper ---
+    // Tell the user why voice input failed instead of silently doing nothing,
+    // and stop hands-free mode after repeated failures so it cannot loop forever.
+    let transcribeFailures = 0;
+    function handleTranscribeFailure(code) {
+        transcribeFailures++;
+        const quiet = code === 'no_speech' || code === 'no_audio';
+        if (!quiet || transcribeFailures >= 3) {
+            const msg = (code === 'unavailable' || code === 'network')
+                ? "Voice input isn't working right now. Please type your message and I'll answer right away."
+                : "I couldn't catch that. Please try speaking again, or type your message.";
+            addErrorMessage(msg);
+        }
+        const giveUp = transcribeFailures >= 3 || code === 'unavailable' || code === 'network';
+        if (giveUp) {
+            voiceModeActive = false;
+            if (voiceModeBtn) voiceModeBtn.classList.remove('active');
+            updateVisualizerState('hidden', '');
+            return;
+        }
+        if (voiceModeActive && !isSpeaking) {
+            updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.85;">(Speak now)</small>');
+            setTimeout(() => { if (voiceModeActive && !isSpeaking && !isRecording) startListening(); }, 400);
+        } else {
+            updateVisualizerState('hidden', '');
+        }
+    }
+
+    // --- HD Mode: MediaRecorder + Groq Whisper (Gemini fallback on the server) ---
     async function startListeningHD() {
         if (isSpeaking) stopSpeaking();
         if (isRecording) return;
@@ -499,6 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     micBtn.classList.remove('processing');
 
                     if (data.success && data.text && data.text.trim()) {
+                        transcribeFailures = 0;
                         const cleanText = cleanSpokenTranscript(data.text);
                         userInput.value = cleanText;
                         userInput.dispatchEvent(new Event('input'));
@@ -508,20 +536,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } else {
                         console.log("Transcription returned no text or error:", data);
-                        if (voiceModeActive && !isSpeaking) {
-                            updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.85;">(Speak now)</small>');
-                            setTimeout(() => { if (voiceModeActive && !isSpeaking && !isRecording) startListening(); }, 300);
-                        } else {
-                            updateVisualizerState('hidden', '');
-                        }
+                        handleTranscribeFailure(data && data.error);
                     }
                 } catch (err) {
                     console.error("Transcription network error:", err);
                     micBtn.classList.remove('processing');
-                    if (voiceModeActive && !isSpeaking) {
-                        updateVisualizerState('listening', '<span>🎙️ Listening...</span>');
-                        setTimeout(() => { if (voiceModeActive && !isSpeaking && !isRecording) startListening(); }, 400);
-                    }
+                    handleTranscribeFailure('network');
                 }
             };
 
