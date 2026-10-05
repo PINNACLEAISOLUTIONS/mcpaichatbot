@@ -247,6 +247,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return currentMicStream;
     }
 
+    // How long a pause counts as "done talking". Lower = faster replies, but may cut off slow speakers.
+    const VAD_SILENCE_MS = 700;
+
     // Web Audio Voice Activity Detection (VAD) for hands-free voice mode
     function setupVAD(stream, onSilence) {
         cleanupVAD();
@@ -283,8 +286,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (hasSpoken && (voiceModeActive || isRecording)) {
                     if (!silenceStart) {
                         silenceStart = Date.now();
-                    } else if (Date.now() - silenceStart > 1200) {
-                        // 1.2s silence after speech: user finished speaking!
+                    } else if (Date.now() - silenceStart > VAD_SILENCE_MS) {
+                        // short silence after speech: user finished speaking!
                         cleanupVAD();
                         if (onSilence) onSilence();
                     }
@@ -419,7 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (userInput.value.trim()) sendMessage();
                     }, 80);
                 }
-            }, 1300);
+            }, 900);
         };
     }
 
@@ -730,6 +733,124 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- Streaming speech: start talking on the first finished sentence ---
+    // Instead of waiting for the whole reply, each sentence is sent to /api/tts as soon
+    // as it is complete. Later sentences are fetched while earlier ones play.
+    function createStreamSpeaker(msgId) {
+        stopSpeaking();
+        stopListening();
+        const gen = ++speechGen;
+        const alive = () => gen === speechGen;
+        let buffer = '';
+        let enqueued = 0;
+        let spokenAny = false;
+        let failed = false;
+        let finished = false;
+        let playing = false;
+        let fullText = '';
+        const queue = [];
+
+        function fetchSentence(sentence) {
+            return fetch(`${API_BASE}/api/tts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: sentence, voice: getPreferredVoice(), brand: activeBrand })
+            })
+                .then(r => (r.ok ? r.json() : null))
+                .then(d => (d && d.success && d.audio_base64
+                    ? URL.createObjectURL(base64ToBlob(d.audio_base64, d.content_type || 'audio/mpeg'))
+                    : null))
+                .catch(() => null);
+        }
+
+        function enqueue(raw) {
+            const spoken = extractSpeechText(raw);
+            if (!spoken || spoken.length < 2) return;
+            enqueued++;
+            queue.push(fetchSentence(spoken));
+            pump();
+        }
+
+        function done() {
+            if (!alive()) return;
+            isSpeaking = false;
+            userInput.value = '';
+            if (msgId) updateSpeakButton(msgId, false);
+            if (failed && !spokenAny) {
+                speakWithElevenLabs(fullText, msgId); // whole-reply fallback chain
+                return;
+            }
+            if (voiceModeActive) {
+                updateVisualizerState('listening', '<span>🎙️ Listening...</span> <small style="opacity:0.85;">(Speak now)</small>');
+                setTimeout(() => {
+                    if (voiceModeActive && !isSpeaking && !isRecording) startListening();
+                }, 200);
+            }
+        }
+
+        async function pump() {
+            if (playing) return;
+            playing = true;
+            while (queue.length && alive()) {
+                const url = await queue.shift();
+                if (!alive()) break;
+                if (!url) { failed = true; queue.length = 0; break; }
+                await new Promise(resolve => {
+                    systemAudio.onended = resolve;
+                    systemAudio.onerror = resolve;
+                    isSpeaking = true;
+                    currentSpeakingMsgId = msgId;
+                    if (msgId) updateSpeakButton(msgId, true);
+                    if (voiceModeActive) {
+                        updateVisualizerState('speaking', '<span>🔊 Speaking...</span> <small style="opacity:0.85;">(Tap to interrupt)</small>');
+                    }
+                    systemAudio.src = url;
+                    systemAudio.play().catch(resolve);
+                });
+                URL.revokeObjectURL(url);
+                spokenAny = true;
+            }
+            playing = false;
+            if (alive() && finished && !queue.length) done();
+        }
+
+        // Cut finished sentences out of the buffer. The first chunk is short so speech
+        // starts quickly; later chunks are longer so the voice does not sound choppy.
+        function flush() {
+            for (;;) {
+                const minLen = enqueued === 0 ? 20 : 60;
+                if (buffer.length <= minLen) return;
+                const re = /([.!?]["')\]]*)\s|\n/g;
+                re.lastIndex = minLen;
+                const m = re.exec(buffer);
+                if (!m) return;
+                const end = m.index + m[0].length;
+                enqueue(buffer.slice(0, end));
+                buffer = buffer.slice(end);
+            }
+        }
+
+        return {
+            push(token) {
+                if (!alive()) return;
+                buffer += token;
+                flush();
+            },
+            finish(text) {
+                fullText = text;
+                if (!alive()) return;
+                finished = true;
+                if (buffer.trim()) enqueue(buffer);
+                buffer = '';
+                if (enqueued === 0) {
+                    speakWithElevenLabs(text, msgId); // nothing streamed as tokens
+                } else if (!playing && !queue.length) {
+                    done();
+                }
+            }
+        };
+    }
+
     function speakTextBrowser(cleanText, msgId) {
         if (!('speechSynthesis' in window)) return;
         window.speechSynthesis.cancel();
@@ -1011,6 +1132,7 @@ document.addEventListener('DOMContentLoaded', () => {
             chatMessages.appendChild(div);
             const contentDiv = div.querySelector('.message-content');
             const actionsDiv = div.querySelector('.message-actions');
+            const streamSpeaker = autoSpeak ? createStreamSpeaker(msgId) : null;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -1025,6 +1147,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const payload = JSON.parse(line.slice(6));
                         if (payload.type === 'token') {
                             accumulated += payload.content;
+                            if (streamSpeaker) streamSpeaker.push(payload.content);
                             contentDiv.innerHTML = marked.parse(accumulated + '<span class="streaming-cursor">▊</span>');
                             scrollToBottom();
                         } else if (payload.type === 'response') {
@@ -1063,7 +1186,9 @@ document.addEventListener('DOMContentLoaded', () => {
             scrollToBottom();
 
             // Auto-speak in voice mode (clean, natural, concise ElevenLabs voice)
-            if (autoSpeak) {
+            if (streamSpeaker) {
+                streamSpeaker.finish(displayText);
+            } else if (autoSpeak) {
                 speakWithElevenLabs(displayText, msgId);
             }
 
