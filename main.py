@@ -98,6 +98,16 @@ session_total_counts: Dict[str, int] = defaultdict(int)  # Total messages per se
 response_cache: Dict[tuple[str, str], Dict[str, Any]] = {}
 CACHE_TTL = 600  # 10 minutes
 
+# Memory hygiene: the dicts above grow with every visitor, so they are pruned
+# periodically (see _cleanup_loop). Without this a small instance slowly runs
+# out of RAM and the bot goes down.
+chatbot_last_used: Dict[str, float] = {}
+session_last_seen: Dict[str, float] = {}
+CLEANUP_INTERVAL = 300  # seconds between sweeps
+CHATBOT_IDLE_TTL = 3600  # drop idle chat sessions from memory after 1 hour
+MAX_ACTIVE_CHATBOTS = 200
+MAX_CACHE_ENTRIES = 500
+
 # Anti-spam limits
 RATE_LIMIT_IP_PER_MINUTE = 12  # Max requests per IP per 60s
 RATE_LIMIT_IP_PER_10MIN = 40  # Max requests per IP per 10 min
@@ -160,6 +170,7 @@ async def startup_event():
     await gemini_image_client.start()
 
     logger.info(f"🎙️ Voice Agent: {voice_agent.get_status()}")
+    asyncio.create_task(_cleanup_loop())
     logger.info("Backend initialized. Pinnacle AI Experts ready.")
 
 
@@ -169,10 +180,63 @@ async def shutdown_event():
         await gemini_image_client.stop()
 
 
+def _cleanup_state(now: Optional[float] = None) -> None:
+    """Prune in-memory state so a long-running instance does not leak memory."""
+    now = now or time.time()
+
+    for ip in list(ip_request_counts):
+        recent = [t for t in ip_request_counts[ip] if now - t < 600]
+        if recent:
+            ip_request_counts[ip] = recent
+        else:
+            del ip_request_counts[ip]
+
+    for sid in list(session_request_counts):
+        if not [t for t in session_request_counts[sid] if now - t < RATE_LIMIT_SESSION_COOLDOWN]:
+            del session_request_counts[sid]
+
+    for sid in list(session_total_counts):
+        if now - session_last_seen.get(sid, 0) > CHATBOT_IDLE_TTL:
+            session_total_counts.pop(sid, None)
+            session_last_seen.pop(sid, None)
+
+    for key in list(response_cache):
+        if now - response_cache[key].get("timestamp", 0) > CACHE_TTL:
+            del response_cache[key]
+    if len(response_cache) > MAX_CACHE_ENTRIES:
+        oldest = sorted(response_cache, key=lambda k: response_cache[k].get("timestamp", 0))
+        for key in oldest[: len(response_cache) - MAX_CACHE_ENTRIES]:
+            del response_cache[key]
+
+    # Chat history is persisted by the bot itself, so evicting an idle
+    # instance only costs a reload on the visitor's next message.
+    for key in list(active_chatbots):
+        if key.endswith("uptime-llm-probe"):
+            continue
+        if now - chatbot_last_used.get(key, 0) > CHATBOT_IDLE_TTL:
+            active_chatbots.pop(key, None)
+            chatbot_last_used.pop(key, None)
+    if len(active_chatbots) > MAX_ACTIVE_CHATBOTS:
+        by_age = sorted(active_chatbots, key=lambda k: chatbot_last_used.get(k, 0))
+        for key in by_age[: len(active_chatbots) - MAX_ACTIVE_CHATBOTS]:
+            active_chatbots.pop(key, None)
+            chatbot_last_used.pop(key, None)
+
+
+async def _cleanup_loop() -> None:
+    while True:
+        await asyncio.sleep(CLEANUP_INTERVAL)
+        try:
+            _cleanup_state()
+        except Exception as e:  # never let housekeeping kill the loop
+            logger.error(f"State cleanup failed: {e}")
+
+
 def get_chatbot(session_id: str, brand_name: Optional[str] = None) -> PinnacleChatbot:
     """Get or create a chatbot for the given session and brand with strict isolation."""
     resolved_brand = brand.resolve_brand(brand_name)
     cache_key = f"{resolved_brand}_{session_id}"
+    chatbot_last_used[cache_key] = time.time()
     if cache_key in active_chatbots:
         return active_chatbots[cache_key]
 
@@ -212,8 +276,6 @@ async def read_index(request: Request):
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     """Health check endpoint for Render deployment."""
-    print("⚡ UptimeRobot Ping Received! (Keeping bot awake)")
-    logger.info("Health check ping received.")
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 
@@ -311,6 +373,7 @@ async def chat_endpoint(chat_msg: ChatMessage, request: Request):
     ip_request_counts[client_ip].append(now)
     session_request_counts[session_id].append(now)
     session_total_counts[session_id] += 1
+    session_last_seen[session_id] = now
 
     chatbot_instance = get_chatbot(session_id, brand_name=chat_msg.brand)
 

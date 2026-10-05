@@ -45,3 +45,9 @@ Thumbs.db
 logs/
 sessions/
 *.db
+
+# Local-only clutter
+.venv/
+.git_backup/
+*.mp3
+leads.csv
